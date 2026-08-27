@@ -1,0 +1,24 @@
+{
+  "name": "figma-palette-maker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OKLCH palette generation engine, ported from sds.sallee.design/palette-maker for use in a Figma plugin",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "dev": "bun scripts/build.ts --watch",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sandbox.json",
+    "test": "bun test/golden.ts && bun test/differential.ts && bun test/sweep.ts",
+    "test:ui": "bun run build && bun test/ui-smoke.ts",
+    "test:all": "bun run typecheck && bun run test && bun run test:ui"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.100.2",
+    "@happy-dom/global-registrator": "^20.11.9",
+    "@types/bun": "^1.4.0",
+    "@types/node": "^26.4.0",
+    "happy-dom": "^20.11.9",
+    "typescript": "^5.6.0"
+  }
+}

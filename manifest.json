@@ -1,0 +1,12 @@
+{
+  "name": "Palette Maker",
+  "api": "1.0.0",
+  "editorType": ["figma", "figjam"],
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "reasoning": "All palette math runs locally. The plugin never makes network requests."
+  }
+}

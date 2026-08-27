@@ -1,0 +1,9 @@
+{
+  "//": "Sandbox code must not reach for DOM APIs, so it is checked without the DOM lib.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["@figma/plugin-typings"]
+  },
+  "include": ["src", "plugin/code.ts", "plugin/messages.ts"]
+}
