@@ -1,6 +1,11 @@
 /**
  * UI iframe entry. Owns the controls and the live preview; the sandbox owns the document.
  * The engine in ../../src is platform-agnostic, so the exact same code runs on both sides.
+ *
+ * Layout: the preview and the action footer are pinned, and only the middle panel
+ * scrolls. Controls are grouped into tabs rather than one long column, and every
+ * slider gets its own row, because a range input has an intrinsic min-width of
+ * roughly 130px and two of them will not fit side by side in a 420px panel.
  */
 
 import { Channel, PRESET_LIST, PresetId } from '../../src/curves';
@@ -15,7 +20,9 @@ import {
   toCssVariables,
   toJson,
 } from '../../src/palette';
-import { PluginToUi, UiToPlugin } from '../messages';
+import { PluginToUi, UiToPlugin, WindowSize } from '../messages';
+
+type Tab = 'l' | 'c' | 'h' | 'output';
 
 const CHANNEL_LABELS: Record<Channel, string> = {
   l: 'Lightness',
@@ -23,14 +30,26 @@ const CHANNEL_LABELS: Record<Channel, string> = {
   h: 'Hue',
 };
 
-const CHANNEL_STEP: Record<Channel, number> = { l: 0.01, c: 0.001, h: 0.1 };
+const TAB_LABELS: Record<Tab, string> = {
+  l: 'Lightness',
+  c: 'Chroma',
+  h: 'Hue',
+  output: 'Output',
+};
+
+/** Step size for the min/max number inputs, per channel scale. */
+const CHANNEL_STEP: Record<Channel, number> = { l: 0.1, c: 0.001, h: 0.1 };
 
 let config: PaletteConfig = defaultConfig();
 let stops: PaletteStop[] = [];
+let activeTab: Tab = 'l';
 let exportFormat: 'css' | 'json' = 'css';
-let naming = { collectionName: 'Core', groupName: 'gray', modeName: 'Value' };
+const naming = { collectionName: 'Core', groupName: 'gray', modeName: 'Value' };
 
-const app = document.getElementById('app') as HTMLDivElement;
+const previewEl = document.getElementById('preview') as HTMLDivElement;
+const tabsEl = document.getElementById('tabs') as HTMLDivElement;
+const panelsEl = document.getElementById('panels') as HTMLDivElement;
+const footerEl = document.getElementById('footer') as HTMLDivElement;
 
 function send(message: UiToPlugin) {
   parent.postMessage({ pluginMessage: message }, '*');
@@ -43,30 +62,45 @@ function setStatus(text: string, isError = false) {
   el.dataset.error = String(isError);
 }
 
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: Partial<HTMLElementTagNameMap[K]> = {},
+  children: Array<Node | string> = [],
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  node.append(...children);
+  return node;
+}
+
 /* -------------------------------------------------------------------------- */
-/* Controls                                                                    */
+/* Control primitives                                                          */
 /* -------------------------------------------------------------------------- */
+
+function row(label: string, ...control: Node[]): HTMLElement {
+  return el('div', { className: 'row' }, [
+    el('label', { textContent: label }),
+    el('div', { className: 'control' }, control),
+  ]);
+}
 
 function numberRow(
   label: string,
   value: number,
   step: number,
-  onChange: (v: number) => void,
+  onCommit: (v: number) => void,
 ): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'row';
-  const l = document.createElement('label');
-  l.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.step = String(step);
-  input.value = String(Number(value.toFixed(4)));
-  input.oninput = () => {
+  const input = el('input', {
+    type: 'number',
+    step: String(step),
+    value: String(Number(value.toFixed(4))),
+  });
+  // Commit on change, not on every keystroke: re-solving mid-typing fights the caret.
+  input.onchange = () => {
     const v = Number(input.value);
-    if (Number.isFinite(v)) onChange(v);
+    if (Number.isFinite(v)) onCommit(v);
   };
-  row.append(l, input);
-  return row;
+  return row(label, input);
 }
 
 function sliderRow(
@@ -75,149 +109,87 @@ function sliderRow(
   min: number,
   max: number,
   step: number,
-  onChange: (v: number) => void,
+  onInput: (v: number) => void,
 ): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'row';
-  const l = document.createElement('label');
-  l.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'range';
-  input.min = String(min);
-  input.max = String(max);
-  input.step = String(step);
-  input.value = String(value);
-  const out = document.createElement('span');
-  out.className = 'value';
-  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(step < 0.01 ? 4 : 2));
-  out.textContent = fmt(value);
+  const decimals = step >= 1 ? 0 : step >= 0.01 ? 2 : 4;
+  const fmt = (v: number) => (decimals === 0 ? String(Math.round(v)) : v.toFixed(decimals));
+
+  const input = el('input', {
+    type: 'range',
+    min: String(min),
+    max: String(max),
+    step: String(step),
+    value: String(value),
+  });
+  const readout = el('span', { className: 'value', textContent: fmt(value) });
+
   input.oninput = () => {
     const v = Number(input.value);
-    out.textContent = fmt(v);
-    onChange(v);
+    readout.textContent = fmt(v);
+    onInput(v);
   };
-  row.append(l, input, out);
-  return row;
-}
-
-function channelCard(channel: Channel): HTMLElement {
-  const cfg = config[channel];
-  const card = document.createElement('div');
-  card.className = 'card';
-
-  const heading = document.createElement('h2');
-  heading.textContent = CHANNEL_LABELS[channel];
-  card.append(heading);
-
-  const presetRow = document.createElement('div');
-  presetRow.className = 'row';
-  const presetLabel = document.createElement('label');
-  presetLabel.textContent = 'Curve';
-  const select = document.createElement('select');
-  for (const preset of PRESET_LIST[channel]) {
-    const option = document.createElement('option');
-    option.value = preset.id;
-    option.textContent = preset.label;
-    option.selected = preset.id === cfg.preset;
-    select.append(option);
-  }
-  select.onchange = () => {
-    config[channel] = reanchorChannel(channel, select.value as PresetId, cfg.min, cfg.max);
-    render();
-  };
-  presetRow.append(presetLabel, select);
-  card.append(presetRow);
-
-  const equation = PRESET_LIST[channel].find((p) => p.id === cfg.preset)?.equation ?? '';
-  const eq = document.createElement('div');
-  eq.className = 'meta';
-  eq.textContent = equation;
-  card.append(eq);
-
-  const step = CHANNEL_STEP[channel];
-  card.append(
-    numberRow('Min', cfg.min, step, (v) => {
-      config[channel] = reanchorChannel(channel, cfg.preset, v, config[channel].max);
-      render();
-    }),
-    numberRow('Max', cfg.max, step, (v) => {
-      config[channel] = reanchorChannel(channel, cfg.preset, config[channel].min, v);
-      render();
-    }),
-  );
-
-  // Live parameter sliders, straight off the preset's own spec.
-  const specs = PRESET_LIST[channel].find((p) => p.id === cfg.preset)?.params ?? [];
-  if (specs.length) {
-    const grid = document.createElement('div');
-    grid.className = 'params';
-    for (const spec of specs) {
-      const current = cfg.params[spec.name] ?? spec.default;
-      grid.append(
-        sliderRow(spec.label, current, spec.min, spec.max, spec.step, (v) => {
-          config[channel].params[spec.name] = v;
-          refresh();
-        }),
-      );
-    }
-    card.append(grid);
-  }
-
-  return card;
+  return row(label, input, readout);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Render                                                                      */
+/* Preview                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function rampView(): HTMLElement {
-  const wrap = document.createElement('div');
-  const ramp = document.createElement('div');
-  ramp.className = 'ramp';
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  meta.innerHTML = '<span></span><span></span>';
+function renderPreview() {
+  const ramp = el('div', { className: 'ramp' });
+  const meta = el('div', { className: 'meta' });
+
+  const summary = () => {
+    meta.innerHTML = '';
+    meta.append(
+      el('span', { textContent: `${stops.length} stops` }),
+      el('span', {
+        textContent: `${stops[0]?.token ?? ''} to ${stops[stops.length - 1]?.token ?? ''}`,
+      }),
+    );
+  };
 
   for (const stop of stops) {
-    const cell = document.createElement('div');
+    const cell = el('div');
     cell.style.background = stop.hex;
     cell.title = `${stop.token}  ${stop.hex}  ${stop.oklch}`;
     cell.onmouseenter = () => {
       meta.innerHTML = '';
-      const left = document.createElement('span');
-      left.textContent = `${stop.token}  ${stop.hex}`;
-      const right = document.createElement('span');
-      right.textContent = stop.oklch;
-      meta.append(left, right);
+      meta.append(
+        el('span', { textContent: `${stop.token}  ${stop.hex}` }),
+        el('span', { textContent: stop.oklch }),
+      );
     };
     ramp.append(cell);
   }
-  ramp.onmouseleave = () => {
-    meta.innerHTML = `<span>${stops.length} stops</span><span>${stops[0]?.token} to ${
-      stops[stops.length - 1]?.token
-    }</span>`;
-  };
-  ramp.onmouseleave(new MouseEvent('mouseleave'));
+  ramp.onmouseleave = summary;
+  summary();
 
-  wrap.append(ramp, meta);
-  return wrap;
+  previewEl.innerHTML = '';
+  previewEl.append(el('div', { className: 'card' }, [ramp, meta]));
 }
 
-function render() {
-  stops = generatePalette(config);
-  app.innerHTML = '';
+/* -------------------------------------------------------------------------- */
+/* Panels                                                                      */
+/* -------------------------------------------------------------------------- */
 
-  const preview = document.createElement('div');
-  preview.className = 'card';
-  preview.append(rampView());
-  app.append(preview);
+function renderTabs() {
+  tabsEl.innerHTML = '';
+  for (const tab of ['l', 'c', 'h', 'output'] as Tab[]) {
+    const button = el('button', { className: 'tab', textContent: TAB_LABELS[tab] });
+    button.setAttribute('aria-selected', String(tab === activeTab));
+    button.onclick = () => {
+      activeTab = tab;
+      renderTabs();
+      renderPanel();
+    };
+    tabsEl.append(button);
+  }
+}
 
-  const ramp = document.createElement('div');
-  ramp.className = 'card';
-  const rampHeading = document.createElement('h2');
-  rampHeading.textContent = 'Ramp';
-  ramp.append(
-    rampHeading,
+function rampCard(): HTMLElement {
+  return el('div', { className: 'card' }, [
+    el('h2', { textContent: 'Ramp' }),
     sliderRow('Stops', config.stops, MIN_STOPS, MAX_STOPS, 1, (v) => {
       config.stops = v;
       config.stopOverrides = [];
@@ -227,40 +199,150 @@ function render() {
       config.tokenStart = v;
       refresh();
     }),
-  );
-  app.append(ramp);
+  ]);
+}
 
-  app.append(channelCard('l'), channelCard('c'), channelCard('h'));
+function channelCard(channel: Channel): HTMLElement {
+  const cfg = config[channel];
+  const presets = PRESET_LIST[channel];
+  const active = presets.find((p) => p.id === cfg.preset);
 
-  // Naming + actions
-  const out = document.createElement('div');
-  out.className = 'card';
-  const outHeading = document.createElement('h2');
-  outHeading.textContent = 'Output';
-  out.append(outHeading);
+  const select = el('select');
+  for (const preset of presets) {
+    select.append(el('option', { value: preset.id, textContent: preset.label }));
+  }
+  // Set the selection only after the options are attached: an `option.selected` set
+  // before its `select` has adopted it is discarded, which silently lands on the
+  // wrong preset.
+  select.value = cfg.preset;
+  select.onchange = () => {
+    config[channel] = reanchorChannel(
+      channel,
+      select.value as PresetId,
+      config[channel].min,
+      config[channel].max,
+    );
+    renderPanel();
+    refresh();
+  };
 
-  for (const key of ['collectionName', 'groupName', 'modeName'] as const) {
-    const row = document.createElement('div');
-    row.className = 'row';
-    const label = document.createElement('label');
-    label.textContent = { collectionName: 'Collection', groupName: 'Group', modeName: 'Mode' }[key];
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = naming[key];
-    input.oninput = () => {
-      naming[key] = input.value;
+  const card = el('div', { className: 'card' }, [
+    el('h2', { textContent: `${CHANNEL_LABELS[channel]} curve` }),
+    row('Curve', select),
+    el('p', { className: 'equation', textContent: active?.equation ?? '' }),
+    numberRow('Min', cfg.min, CHANNEL_STEP[channel], (v) => {
+      config[channel] = reanchorChannel(channel, cfg.preset, v, config[channel].max);
+      renderPanel();
+      refresh();
+    }),
+    numberRow('Max', cfg.max, CHANNEL_STEP[channel], (v) => {
+      config[channel] = reanchorChannel(channel, cfg.preset, config[channel].min, v);
+      renderPanel();
+      refresh();
+    }),
+  ]);
+
+  // Live parameter sliders, generated straight off the preset's own spec.
+  const specs = active?.params ?? [];
+  if (specs.length) {
+    const params = el('div', { className: 'params' });
+    for (const spec of specs) {
+      const current = cfg.params[spec.name] ?? spec.default;
+      // A solved param can sit outside the original slider range, so widen to fit.
+      const min = Math.min(spec.min, current);
+      const max = Math.max(spec.max, current);
+      params.append(
+        sliderRow(spec.label, current, min, max, spec.step, (v) => {
+          config[channel].params[spec.name] = v;
+          refresh();
+        }),
+      );
+    }
+    const reset = el('button', { textContent: 'Re-solve from min/max' });
+    reset.onclick = () => {
+      config[channel] = reanchorChannel(channel, cfg.preset, cfg.min, cfg.max);
+      renderPanel();
+      refresh();
     };
-    row.append(label, input);
-    out.append(row);
+    params.append(el('div', { className: 'linkrow' }, [reset]));
+    card.append(params);
   }
 
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  actions.style.marginTop = '8px';
+  return card;
+}
 
-  const variables = document.createElement('button');
-  variables.className = 'primary';
-  variables.textContent = 'Create variables';
+function outputCard(): HTMLElement {
+  const card = el('div', { className: 'card' }, [el('h2', { textContent: 'Naming' })]);
+
+  const labels: Record<keyof typeof naming, string> = {
+    collectionName: 'Collection',
+    groupName: 'Group',
+    modeName: 'Mode',
+  };
+
+  for (const key of ['collectionName', 'groupName', 'modeName'] as const) {
+    const input = el('input', { type: 'text', value: naming[key] });
+    input.oninput = () => {
+      naming[key] = input.value;
+      refreshExport();
+    };
+    card.append(row(labels[key], input));
+  }
+  return card;
+}
+
+function exportCard(): HTMLElement {
+  const toggle = el('div', { className: 'actions' });
+  for (const format of ['css', 'json'] as const) {
+    const button = el('button', {
+      textContent: format.toUpperCase(),
+      className: format === exportFormat ? 'primary' : '',
+    });
+    button.onclick = () => {
+      exportFormat = format;
+      renderPanel();
+    };
+    toggle.append(button);
+  }
+
+  const textarea = el('textarea', { readOnly: true, id: 'export' });
+  textarea.value = exportText();
+
+  const copy = el('button', { textContent: 'Copy to clipboard' });
+  copy.onclick = () => {
+    textarea.select();
+    document.execCommand('copy');
+    setStatus(`Copied ${exportFormat.toUpperCase()}`);
+  };
+
+  const spacer = el('div');
+  spacer.style.height = '8px';
+
+  return el('div', { className: 'card' }, [
+    el('h2', { textContent: 'Export' }),
+    toggle,
+    spacer,
+    textarea,
+    el('div', { className: 'linkrow' }, [copy]),
+  ]);
+}
+
+function exportText(): string {
+  const name = naming.groupName.trim() || 'gray';
+  return exportFormat === 'css' ? toCssVariables(stops, name) : toJson(stops, name);
+}
+
+function renderPanel() {
+  panelsEl.innerHTML = '';
+  if (activeTab === 'output') {
+    panelsEl.append(rampCard(), outputCard(), exportCard());
+  } else {
+    panelsEl.append(rampCard(), channelCard(activeTab));
+  }
+}
+
+function renderFooter() {
+  const variables = el('button', { className: 'primary', textContent: 'Create variables' });
   variables.onclick = () =>
     send({
       type: 'create-variables',
@@ -270,73 +352,123 @@ function render() {
       modeName: naming.modeName.trim() || 'Value',
     });
 
-  const swatches = document.createElement('button');
-  swatches.textContent = 'Create swatches';
+  const swatches = el('button', { textContent: 'Create swatches' });
   swatches.onclick = () => send({ type: 'create-swatches', stops, label: true });
 
-  actions.append(variables, swatches);
-  out.append(actions);
+  footerEl.innerHTML = '';
+  footerEl.append(
+    el('div', { className: 'actions' }, [variables, swatches]),
+    el('div', { id: 'status' }),
+  );
+}
 
-  const status = document.createElement('div');
-  status.id = 'status';
-  out.append(status);
-  app.append(out);
+/* -------------------------------------------------------------------------- */
+/* Update cycles                                                               */
+/* -------------------------------------------------------------------------- */
 
-  // Export
-  const exportCard = document.createElement('div');
-  exportCard.className = 'card';
-  const exportHeading = document.createElement('h2');
-  exportHeading.textContent = 'Export';
-  const toggle = document.createElement('div');
-  toggle.className = 'actions';
-  toggle.style.marginBottom = '6px';
-  for (const format of ['css', 'json'] as const) {
-    const button = document.createElement('button');
-    button.textContent = format.toUpperCase();
-    if (format === exportFormat) button.className = 'primary';
-    button.onclick = () => {
-      exportFormat = format;
-      render();
-    };
-    toggle.append(button);
-  }
-  const textarea = document.createElement('textarea');
-  textarea.readOnly = true;
-  const name = naming.groupName.trim() || 'gray';
-  textarea.value =
-    exportFormat === 'css' ? toCssVariables(stops, name) : toJson(stops, name);
-
-  const copy = document.createElement('button');
-  copy.textContent = 'Copy';
-  copy.style.marginTop = '6px';
-  copy.style.width = '100%';
-  copy.onclick = () => {
-    textarea.select();
-    document.execCommand('copy');
-    setStatus(`Copied ${exportFormat.toUpperCase()} to clipboard`);
-  };
-
-  exportCard.append(exportHeading, toggle, textarea, copy);
-  app.append(exportCard);
-
+/** Full rebuild: use when the set of controls changes. */
+function render() {
+  stops = generatePalette(config);
+  renderPreview();
+  renderTabs();
+  renderPanel();
+  renderFooter();
   send({ type: 'save-config', config });
 }
 
-/** Cheap path: regenerate the ramp without rebuilding every control. */
+/** Cheap path: recolor the preview and refresh the export without touching controls. */
 function refresh() {
   stops = generatePalette(config);
-  const preview = app.querySelector('.card');
-  if (preview) {
-    preview.innerHTML = '';
-    preview.append(rampView());
-  }
-  const textarea = app.querySelector('textarea');
-  if (textarea) {
-    const name = naming.groupName.trim() || 'gray';
-    textarea.value =
-      exportFormat === 'css' ? toCssVariables(stops, name) : toJson(stops, name);
-  }
+  renderPreview();
+  refreshExport();
   send({ type: 'save-config', config });
+}
+
+function refreshExport() {
+  const textarea = document.getElementById('export') as HTMLTextAreaElement | null;
+  if (textarea) textarea.value = exportText();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Window resizing                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Figma gives plugins no native window resizing and no resize event, so the only
+ * lever is figma.ui.resize(). The iframe edges act as the drag targets. They carry
+ * a resize cursor and nothing else, so there is no grip icon in the corner.
+ */
+const SIZE_LIMITS = { minWidth: 260, minHeight: 320, maxWidth: 1600, maxHeight: 1600 };
+
+function clampSize(size: WindowSize): WindowSize {
+  return {
+    width: Math.round(
+      Math.min(SIZE_LIMITS.maxWidth, Math.max(SIZE_LIMITS.minWidth, size.width)),
+    ),
+    height: Math.round(
+      Math.min(SIZE_LIMITS.maxHeight, Math.max(SIZE_LIMITS.minHeight, size.height)),
+    ),
+  };
+}
+
+function initResize() {
+  const zones: Array<[string, 'x' | 'y' | 'both']> = [
+    ['grab-x', 'x'],
+    ['grab-y', 'y'],
+    ['grab-xy', 'both'],
+  ];
+
+  for (const [id, axis] of zones) {
+    const zone = document.getElementById(id);
+    if (!zone) continue;
+
+    zone.addEventListener('pointerdown', (event: PointerEvent) => {
+      event.preventDefault();
+      zone.setPointerCapture(event.pointerId);
+
+      const startX = event.screenX;
+      const startY = event.screenY;
+      const startWidth = window.innerWidth;
+      const startHeight = window.innerHeight;
+      document.body.dataset.resizing = 'true';
+
+      let frame = 0;
+      let pending: WindowSize | null = null;
+
+      const flush = () => {
+        frame = 0;
+        if (pending) send({ type: 'resize', size: pending, commit: false });
+        pending = null;
+      };
+
+      const onMove = (move: PointerEvent) => {
+        pending = clampSize({
+          width: axis === 'y' ? startWidth : startWidth + (move.screenX - startX),
+          height: axis === 'x' ? startHeight : startHeight + (move.screenY - startY),
+        });
+        // Coalesce to one resize per frame; the sandbox round trip is not free.
+        if (!frame) frame = requestAnimationFrame(flush);
+      };
+
+      const onUp = () => {
+        zone.removeEventListener('pointermove', onMove);
+        zone.removeEventListener('pointerup', onUp);
+        zone.removeEventListener('pointercancel', onUp);
+        if (frame) cancelAnimationFrame(frame);
+        delete document.body.dataset.resizing;
+        // Commit the final size so it is the one that gets remembered.
+        send({
+          type: 'resize',
+          size: clampSize({ width: window.innerWidth, height: window.innerHeight }),
+          commit: true,
+        });
+      };
+
+      zone.addEventListener('pointermove', onMove);
+      zone.addEventListener('pointerup', onUp);
+      zone.addEventListener('pointercancel', onUp);
+    });
+  }
 }
 
 window.onmessage = (event: MessageEvent) => {
@@ -350,4 +482,5 @@ window.onmessage = (event: MessageEvent) => {
   if (message.type === 'error') setStatus(message.message, true);
 };
 
+initResize();
 render();

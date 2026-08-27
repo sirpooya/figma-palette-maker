@@ -2,6 +2,11 @@
 
 import { PaletteConfig, PaletteStop } from '../src/palette';
 
+export interface WindowSize {
+  width: number;
+  height: number;
+}
+
 export type UiToPlugin =
   | { type: 'create-swatches'; stops: PaletteStop[]; label: boolean }
   | {
@@ -12,7 +17,8 @@ export type UiToPlugin =
       modeName: string;
     }
   | { type: 'save-config'; config: PaletteConfig }
-  | { type: 'resize'; height: number };
+  /** Sent continuously while an edge is dragged; `commit` marks the drag end. */
+  | { type: 'resize'; size: WindowSize; commit: boolean };
 
 export type PluginToUi =
   | { type: 'restore-config'; config: PaletteConfig | null }

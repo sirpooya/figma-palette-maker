@@ -18,6 +18,13 @@ Then in the Figma desktop app: **Plugins > Development > Import plugin from mani
 and pick `manifest.json` in this folder. It shows up under Plugins > Development >
 Palette Maker.
 
+The window is resizable by dragging its right edge, bottom edge, or bottom-right
+corner. There is no grip icon; the edges just change the cursor. Figma exposes no native
+window resizing and no resize event, so the iframe edges drive `figma.ui.resize()`
+directly. The size you leave it at is remembered for next time, and the layout is fluid
+from 260px up: the curve parameters go one per row when narrow and two-up when there is
+room, and labels stack above their controls below 320px.
+
 While iterating:
 
 ```
@@ -164,7 +171,7 @@ The plugin around it:
 | [manifest.json](manifest.json) | Figma manifest. `documentAccess: dynamic-page`, no network access |
 | [plugin/code.ts](plugin/code.ts) | Sandbox entry: handles messages, persists config in clientStorage |
 | [plugin/ui/main.ts](plugin/ui/main.ts) | UI iframe: controls, live preview, export panel |
-| [plugin/ui/index.html](plugin/ui/index.html) | UI shell and CSS, themed off Figma's own color variables |
+| [plugin/ui/index.html](plugin/ui/index.html) | UI shell and CSS: themed off Figma's color variables, fluid, invisible resize edges |
 | [plugin/messages.ts](plugin/messages.ts) | The typed message contract between the two sides |
 | [src/figma.ts](src/figma.ts) | Figma paints, variables, canvas swatches |
 | [scripts/build.ts](scripts/build.ts) | Bundles both sides into `dist/`, with `--watch` |
