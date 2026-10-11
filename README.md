@@ -11,8 +11,9 @@ The plugin has two tools:
 
 - **Curves**: the palette maker port. Three OKLCH curves produce a ramp of any length.
 - **Brand**: a [Digikala Design System](https://assets.alamut.digikala.com/llms.txt) theme
-  generator. Pick a primary and a secondary color and it derives every DDS theme slot with
-  a formula reverse-engineered from the 20 brand themes already in the DDS. See
+  generator. It ships empty: import a recipe (the DDS one, reverse-engineered from the 20
+  brand themes already in the DDS, is [recipes/dds.json](recipes/dds.json)), pick a primary
+  and a secondary color, and it derives every DDS theme slot. See
   [Brand themes (DDS)](#brand-themes-dds).
 
 ## Run it in Figma
@@ -59,8 +60,8 @@ pnpm test:all       # all of the above
 | `test/golden.ts` | all 16 default stops match the live site's rendered output |
 | `test/differential.ts` | 4784 comparisons against the original minified functions, 0 mismatches |
 | `test/sweep.ts` | 1372 preset combinations produce no NaN and no malformed hex |
-| `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, buttons post the right messages |
-| `test/brand.ts` | step numbers match the DDS names, the recipe reproduces the DDS themes, on-colors match all 40 bases, and `DDS_RECIPE` still equals a fresh fit of the fixture |
+| `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, the Brand tool starts empty, recipe import/export works, the strip dots edit the recipe, buttons post the right messages |
+| `test/brand.ts` | step numbers match the DDS names, the recipe reproduces the DDS themes, on-colors match all 40 bases, `recipes/dds.json` still equals a fresh fit of the fixture, and recipe files round-trip and refuse bad input |
 
 ## How the math works
 
@@ -171,7 +172,7 @@ the DDS does when it collapses a slot onto the base.
 | `primary-tint-1` | lighten to step 3 |
 | `primary-tint-2` | base + 88% white, which is the alpha-12 color flattened onto white |
 | `primary-tint-3` | lighten to step 21 |
-| `primary-gradient` | the base (as in 12 of the 20 brands), unless a gradient color is picked |
+| `primary-gradient` | the base, as in 12 of the 20 brands |
 | `primary-base` | the input color |
 | `primary-shade-2` | base + 20% black |
 | `primary-shade-1` | base + 55% black |
@@ -180,7 +181,7 @@ the DDS does when it collapses a slot onto the base.
 | `secondary-shade-1` | base + 41% black |
 | `*-base-alpha-12` | the base at 12% opacity |
 | `on-*` | white when white on the base reaches 2:1 contrast, otherwise `#0A0A0A` (neutral-96) |
-| `tertiary-*` | the DDS neutrals `#ECEDEF`, `#848484`, `#333333`, `#0A0A0A` and white, unless a tertiary color is picked; that one lightens to steps 7 and 48 and darkens to step 96, the steps of the neutral set |
+| `tertiary-*` | with the tertiary left empty (or set to `#333333`, the DDS tertiary base), the exact DDS neutrals `#ECEDEF`, `#848484`, `#333333`, `#0A0A0A` and white; any other tertiary color lightens to steps 7 and 48 and darkens to step 96, the steps of the neutral set |
 
 Slots never pass each other: if a light base would put a fixed-mix tint lighter than a
 fixed-step one (12% of a step-15 base is lighter than step 3), the slot takes its lighter
@@ -224,28 +225,87 @@ How close it gets, as mean ΔE (OKLab × 100, where about 2 is the visible thres
 the hand-picked tokens: tint-1 0.9, primary tint-2 2.1, secondary tint-1 2.0, shade-2 4.5,
 tint-3 6.0, shade-1 6.4, secondary tint-2 7.8 and secondary shade-1 10.7. The larger numbers
 are where the brands disagree with each other: shop's tint-3 is step 35 and plus's is 20.
-The Recipe tab exposes every constant for a brand that wants to deviate, the way super-coin
-keeps its shades lighter than the recipe.
+Every rule stays editable (drag its dot on the strips) for a brand that wants to deviate,
+the way super-coin keeps its shades lighter than the recipe.
 
 ### What the plugin writes
 
 **Create variables** writes a single theme layer, without Core primitives: a collection named
-`🌈 Theme` (editable) holding the 21 variables above, named exactly as in the DDS
-(`primary/primary-tint-1`, `theme` and so on), with raw color values in a mode named after
-the brand. Running it for another brand adds a mode; running it again for the same brand
-updates that mode. Figma caps the modes per collection by plan, which is why the DDS chains
-`🌈 Theme 2` and `🌈 Theme 3`. When the cap is hit, the plugin says so, and a new collection
-name starts a fresh one.
+after the brand, holding the 21 variables above named exactly as in the DDS
+(`primary/primary-tint-1`, `theme` and so on), with raw color values in a mode of the same
+name. Running it again for the same brand updates that collection; a different brand name
+gets its own collection. One mode per collection also means it works on Figma's free plan,
+which allows a single mode.
 
 **Create documentation** draws a token sheet on the current page: each group's slots from
 light to dark with step and hex, then a table of every variable with its usage. When the
 theme variables exist, the swatches are bound to them, so the sheet follows later edits.
 
-In the plugin window, the **Brand** tool has three tabs: **Colors** (brand name, primary,
-secondary, optional tertiary and gradient, target collection), **Recipe** (every fitted
-constant as a slider, with a reset to the DDS fit) and **Theme** (all 21 variables with
-value and step, plus a JSON export in the DDS tokens shape). The preview shows each group's
-white → base → black spectrum with a dot on every slot.
+In the plugin window, the **Brand** tool starts empty: no recipe, no colors, nothing to
+create. At the top, Primary, Secondary and Tertiary sit side by side as Figma-style color
+fields (swatch inside, hex without the `#`; typing or pasting with it works too), with Name
+below them. Empty fields show `ED1944`, `1672DD` and `333333` as placeholder hints only.
+Import a recipe first; it is kept in the plugin's storage on that computer
+(`figma.clientStorage`), so it is still there next time. Then fill in a primary, a secondary
+and a name.
+
+Below the fields, one scrolling panel holds everything else, with no tabs. First the recipe:
+**Reset**, **Clear**, **Import** and **Export** on its heading row (Reset appears only after
+an edit and returns to the imported file; Clear removes the recipe, saved copy included, and
+returns the tool to its empty start), then one column of equal rows, each with its label on
+top and a full-width bar below: a strip per group
+showing its white → base → black spectrum with a dot on every slot, then **On-color** (the
+contrast ratio from which on-colors turn white, on a plain bar) and **Alpha** (the opacity of
+the `base-alpha-12` slots, starting from the recipe's `alpha`, shown as neutral black fading
+in over a checkerboard), drawn the same way with their value printed in the bar. The dots are
+the recipe's controls: drag one along its strip (or focus it and use the arrow keys, Shift
+for 10 steps) to move that tint or shade, and the strip's label reads out the rule while you
+do. The base dot is your color and does not move; a tertiary left on the recipe's fixed set
+has no handles. Under the recipe, the theme it produces: the 20 color variables with value
+and step, updating live, with **Copy JSON** on its heading row (the theme in the DDS tokens
+shape).
+
+### Recipe files
+
+The recipe is data, not code, and the plugin bundles none. Every number and every fixed
+color comes from the imported file. The DDS one is [recipes/dds.json](recipes/dds.json);
+**Import** / **Export** on the Recipe tab read and write this format:
+
+```json
+{
+  "format": "palette-maker-recipe",
+  "version": 1,
+  "name": "DDS fit",
+  "primary": {
+    "tint-1": { "step": 3 },
+    "tint-2": { "white": 88 },
+    "tint-3": { "step": 21 },
+    "shade-2": { "black": 20 },
+    "shade-1": { "black": 55 }
+  },
+  "secondary": { "tint-1": { "step": 4 }, "tint-2": { "white": 68 }, "shade-1": { "black": 41 } },
+  "tertiary": { "tint-1": { "step": 7 }, "tint-2": { "step": 48 }, "shade-1": { "step": 96 } },
+  "onContrast": 2,
+  "onDark": "#0A0A0A",
+  "alpha": 12,
+  "tertiaryDefault": {
+    "base": "#333333",
+    "tint-1": "#ECEDEF",
+    "tint-2": "#848484",
+    "shade-1": "#0A0A0A",
+    "on": "#FFFFFF"
+  }
+}
+```
+
+Each slot takes exactly one rule: `step` (lighten or darken to that DDS step, 0 to 100),
+`white` for a tint or `black` for a shade (the share mixed in, in percent). `onContrast` is
+the contrast ratio from which on-colors turn white, `onDark` the on-color below it, `alpha`
+the opacity of the `base-alpha-12` slots in percent. `tertiaryDefault` is the fixed tertiary
+used when no tertiary color is picked; without it, a tertiary color is required. `name` (shown in the
+**Reset** button's tooltip) and `description` are optional, and so are `format` and `version` in
+a hand-written file. Import is all or nothing: a file with a missing,
+misspelled or out-of-range slot is refused with the reason, and the current recipe stays.
 
 ## Using the engine directly
 
@@ -288,9 +348,10 @@ figma.currentPage.appendChild(frame);
 The brand engine works the same way:
 
 ```ts
-import { generateBrandTheme } from './src/brand';
+import { generateBrandTheme, parseRecipe } from './src/brand';
 
-const theme = generateBrandTheme({ name: 'Shop', primary: '#ED1944', secondary: '#1672DD' });
+const recipe = parseRecipe(await Bun.file('recipes/dds.json').text());
+const theme = generateBrandTheme({ name: 'Shop', primary: '#ED1944', secondary: '#1672DD' }, recipe);
 
 theme.slots[0];
 // {
@@ -302,8 +363,8 @@ theme.slots[0];
 
 // In the sandbox: one theme layer, and a token sheet bound to it.
 import { writeBrandTheme, paintBrandDoc } from './src/figma';
-await writeBrandTheme(theme, { collectionName: '🌈 Theme' });
-const { frame: sheet } = await paintBrandDoc(theme, { collectionName: '🌈 Theme' });
+await writeBrandTheme(theme);                 // collection "Shop", mode "Shop"
+const { frame: sheet } = await paintBrandDoc(theme);
 ```
 
 ## Files
@@ -315,7 +376,8 @@ The engine, platform-agnostic and dependency-free:
 | [src/oklch.ts](src/oklch.ts) | OKLab/OKLCH/sRGB conversions, gamut mapping, hex and OKLCH formatting |
 | [src/curves.ts](src/curves.ts) | The seven presets, their parameter specs, and the solvers |
 | [src/palette.ts](src/palette.ts) | Config types, token numbering, `generatePalette`, CSS/JSON export |
-| [src/brand.ts](src/brand.ts) | DDS brand themes: step numbers, the fitted `DDS_RECIPE`, `generateBrandTheme` |
+| [src/brand.ts](src/brand.ts) | DDS brand themes: step numbers, recipe files, `generateBrandTheme` |
+| [recipes/dds.json](recipes/dds.json) | The DDS recipe, fitted to the DDS brand themes; import it in the plugin (not bundled) |
 | [src/index.ts](src/index.ts) | Re-exports the engine (not `figma.ts`) |
 
 The plugin around it:
@@ -329,7 +391,7 @@ The plugin around it:
 | [plugin/messages.ts](plugin/messages.ts) | The typed message contract between the two sides |
 | [src/figma.ts](src/figma.ts) | Figma paints, variables, canvas swatches, the brand theme layer and its documentation sheet |
 | [scripts/build.ts](scripts/build.ts) | Bundles both sides into `dist/`, with `--watch` |
-| [scripts/fit-recipe.ts](scripts/fit-recipe.ts) | Refits the brand recipe from the DDS fixture and prints the cross-validation table |
+| [scripts/fit-recipe.ts](scripts/fit-recipe.ts) | Refits the brand recipe from the DDS fixture and prints the cross-validation table; `--write` rewrites `recipes/dds.json` |
 | [scripts/dds-fixture.ts](scripts/dds-fixture.ts) | Rebuilds `test/fixtures/dds-themes.json` from the DDS tokens API (needs network) |
 
 `src/figma.ts` is deliberately left out of `index.ts` because it touches the `figma`
@@ -361,5 +423,5 @@ as a test oracle. It is not part of the shipped code.
 `test/fixtures/dds-themes.json` holds the DDS core colors and brand themes, taken from
 `https://assets.alamut.digikala.com/api/tokens` (the file records the commit it came from).
 It is the oracle the brand recipe is fitted and tested against, not shipped either. Refresh
-it with `bun scripts/dds-fixture.ts`, then run `bun scripts/fit-recipe.ts` and update
-`DDS_RECIPE` if the fit moved.
+it with `bun scripts/dds-fixture.ts`, then run `bun scripts/fit-recipe.ts --write` to
+refit `recipes/dds.json` against it.

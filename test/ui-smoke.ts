@@ -126,12 +126,10 @@ window.dispatchEvent(
 );
 check('empty restore is safe', $$('.ramp > div').length, 8);
 
-window.dispatchEvent(
-  new MessageEvent('message', {
-    data: { pluginMessage: { type: 'error', message: 'nope' } },
-  }),
-);
-check('error surfaces in status', document.getElementById('status')?.textContent, 'nope');
+// Feedback is Figma's toast: the panel asks the sandbox to notify, and shows no status line.
+check('no status line in the panel', Boolean($('#status')), false);
+click('Copy to clipboard');
+check('feedback goes to a toast', last('notify')?.message, 'Copied JSON');
 
 /* -------------------------------------------------------------------------- */
 /* Resizing                                                                    */
@@ -206,45 +204,184 @@ check('curves is the default tool', tools()[0].getAttribute('aria-pressed'), 'tr
 
 tools()[1].click();
 check('brand tool pressed', tools()[1].getAttribute('aria-pressed'), 'true');
-check('brand tabs', tabs().map((t) => t.textContent).join(','), 'Colors,Recipe,Theme');
+check('no tabs in the Brand tool', tabs().length, 0);
+check('brand fields sit above the tabs', Boolean($('#form .color-field')), true);
+
+// Headless: no recipe and no colors until the user imports a recipe.
+const nameField = () => rowNamed('Name')?.querySelector('input') as HTMLInputElement;
+const footerButtons = () => $$('#footer button') as HTMLButtonElement[];
+const previewEmpty = () => $('#preview')?.children.length === 0;
+const recipeEmptyState = () => $('#panels .empty-state button')?.textContent;
+check('no recipe, no spectra', $$('.spectrum').length, 0);
+check('no preview without a theme', previewEmpty(), true);
+check('name starts empty', nameField().value, '');
+check('colors start empty', hexFields().map((f) => f.value).join(','), ',,');
+check('placeholders hint the colors', hexFields().map((f) => f.placeholder).join(','), 'ED1944,1672DD,333333');
+check('nothing to create yet', footerButtons().every((b) => b.disabled), true);
+check('the panel offers an import', recipeEmptyState(), 'Import recipe');
+
+// Importing goes through the real file input.
+const recipeInput = () => $('input[type="file"]') as HTMLInputElement;
+const pick = async (name: string, text: string) => {
+  Object.defineProperty(recipeInput(), 'files', {
+    value: [new File([text], name, { type: 'application/json' })],
+    configurable: true,
+  });
+  fire(recipeInput(), 'change');
+  await wait(50);
+};
+await pick('dds.json', await Bun.file(new URL('../recipes/dds.json', import.meta.url)).text());
+check('import is reported', last('notify')?.message, 'Imported the recipe from dds.json');
+check('still nothing to preview without colors', previewEmpty(), true);
+const resetShown = (name: string) => {
+  const button = ($$('button') as HTMLButtonElement[]).find((b) => b.textContent === 'Reset');
+  return Boolean(button) && button!.style.display !== 'none' && button!.title === `Back to ${name}, as imported`;
+};
+check('no reset while the recipe is as imported', resetShown('DDS fit'), false);
+
+nameField().value = 'New brand';
+fire(nameField(), 'input');
+hexFields()[0].value = '#ed1944';
+fire(hexFields()[0], 'change');
+check('one color short, still nothing to create', footerButtons().every((b) => b.disabled), true);
+hexFields()[1].value = '#1672dd';
+fire(hexFields()[1], 'change');
 check('one spectrum per group', $$('.spectrum').length, 3);
 check('primary has six slot markers', $$('.spectrum')[0].querySelectorAll('.marker').length, 6);
 check('base marker sits at its step', marker('primary-base')?.style.left, '63%');
 check('tint-1 marker at step 3', marker('primary-tint-1')?.style.left, '3%');
+check('actions enabled once there is a theme', footerButtons().every((b) => !b.disabled), true);
 
 // The hex field drives the theme.
 hexFields()[0].value = '#7f53ef';
 fire(hexFields()[0], 'change');
-check('hex is normalized', hexFields()[0].value, '#7F53EF');
+check('hex shows without the #', hexFields()[0].value, '7F53EF');
+hexFields()[1].value = '1672dd';
+fire(hexFields()[1], 'change');
+check('typing without the # works', hexFields()[1].value, '1672DD');
 check('primary drives the spectrum', marker('primary-base')?.style.left, '55%');
 
 hexFields()[0].value = 'not a color';
 fire(hexFields()[0], 'change');
-check('bad hex is refused', hexFields()[0].value, '#7F53EF');
-check('bad hex is reported', document.getElementById('status')?.dataset.error, 'true');
+check('bad hex is refused', hexFields()[0].value, '7F53EF');
+check('bad hex is reported', last('notify')?.error, true);
 
-// Tertiary starts on the DDS neutrals; picking Custom adds a color field.
-const tertiarySelect = () => ($$('select') as HTMLSelectElement[])[0];
-check('tertiary defaults to neutrals', tertiarySelect().value, 'off');
-tertiarySelect().value = 'custom';
-fire(tertiarySelect(), 'change');
-check('custom tertiary adds a color field', hexFields().length, 3);
+// Left empty, the tertiary is the recipe's fixed set; a color runs the recipe.
+check('tertiary left empty', hexFields()[2].value, '');
+check('empty tertiary uses the recipe set', marker('tertiary-tint-1')?.style.left, '7%');
+check('a fixed tertiary has no handles', marker('tertiary-tint-1')?.classList.contains('draggable'), false);
+hexFields()[2].value = '#2bb5b2';
+fire(hexFields()[2], 'change');
+check('custom tertiary runs the recipe', marker('tertiary-base')?.style.left, '45%');
+check('and gets handles', marker('tertiary-tint-1')?.classList.contains('draggable'), true);
 
-// Recipe sliders move the slots live.
-openTab('Recipe');
-const tint1 = rowNamed('Tint 1')?.querySelector('input[type="range"]') as HTMLInputElement;
-check('recipe shows steps', rowNamed('Tint 1')?.querySelector('.value')?.textContent, 'step 03');
-tint1.value = '10';
-fire(tint1, 'input');
-check('tint-1 slider moves the marker', marker('primary-tint-1')?.style.left, '10%');
-check('mix rules read as percentages', rowNamed('Shade 1')?.querySelector('.value')?.textContent, '55%');
-click('Reset to the DDS fit');
-check('reset restores the fit', marker('primary-tint-1')?.style.left, '3%');
+// No gradient control: primary-gradient simply follows the primary.
+check('no gradient row', rowNamed('Gradient'), undefined);
+
+// The dots are the recipe: drag one, or focus it and use the arrow keys. (happy-dom has no
+// layout, so this drives them by keyboard; the drag itself is checked in real Chrome.)
+const nudge = (key: string, steps: number) => {
+  for (let i = 0; i < Math.abs(steps); i++) {
+    marker(key)!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: steps > 0 ? 'ArrowRight' : 'ArrowLeft', bubbles: true }),
+    );
+  }
+};
+const stripLabel = (i: number) => ($$('.spectrum-row .name')[i] as HTMLElement).textContent;
+check('no per-slot sliders any more', rowNamed('Tint 1'), undefined);
+check('strips live in the recipe card', Boolean($('#panels .card .strips .spectra')), true);
+check('nothing pinned above the tabs but the fields', previewEmpty(), true);
+check(
+  'one column: strips, then the two rules',
+  $$('.recipe-rows .spectrum-row .name').map((n) => n.textContent).join(','),
+  'Primary,Secondary,Tertiary,On-color,Alpha',
+);
+check('on-color prints a ratio', ($$('.strip-value')[0] as HTMLElement).textContent, '2.0:1');
+check('alpha starts at the recipe value', ($$('.strip-value')[1] as HTMLElement).textContent, '12%');
+const alphaBar = $$('.strip-range')[1] as HTMLInputElement;
+alphaBar.value = '20';
+fire(alphaBar, 'input');
+check('alpha prints its value in the bar', ($$('.strip-value')[1] as HTMLElement).textContent, '20%');
+check('alpha bar edits the recipe', resetShown('DDS fit'), true);
+alphaBar.value = '12';
+fire(alphaBar, 'input');
+check('alpha back', resetShown('DDS fit'), false);
+const onColorBar = $$('.strip-range')[0] as HTMLInputElement;
+onColorBar.value = '3';
+fire(onColorBar, 'input');
+check('on-color bar edits the recipe', resetShown('DDS fit'), true);
+onColorBar.value = '2';
+fire(onColorBar, 'input');
+check('and back', resetShown('DDS fit'), false);
+check('tint dots are draggable', marker('primary-tint-1')?.classList.contains('draggable'), true);
+check('the base dot is not', marker('primary-base')?.classList.contains('draggable'), false);
+check('a dot names its rule', marker('primary-tint-1')?.title.endsWith('(step 03)'), true);
+check('mix rules read as percentages', marker('primary-shade-1')?.title.endsWith('(55%)'), true);
+nudge('primary-tint-1', 7);
+check('a dot moves its slot', marker('primary-tint-1')?.style.left, '10%');
+check('the strip label reads out the rule', stripLabel(0), 'Tint 1 step 10');
+check('an edit shows the reset', resetShown('DDS fit'), true);
+nudge('primary-tint-1', -7);
+check('back to the imported value hides it', resetShown('DDS fit'), false);
+nudge('primary-shade-1', 5);
+check('a mix dot moves by a share', marker('primary-shade-1')?.title.endsWith('(55%)'), false);
+nudge('primary-tint-1', 7);
+click('Reset');
+check('reset restores the imported recipe', marker('primary-tint-1')?.style.left, '3%');
+check('and hides itself again', resetShown('DDS fit'), false);
+
+// Export hands over the recipe as a JSON file named after the brand.
+let downloadName = '';
+let downloadBlob: Blob | null = null;
+const realCreate = URL.createObjectURL;
+const realAnchorClick = HTMLAnchorElement.prototype.click;
+URL.createObjectURL = (blob: Blob) => ((downloadBlob = blob), 'blob:recipe');
+HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+  downloadName = this.download;
+};
+check(
+  'recipe actions sit on the heading row',
+  (Array.from($('.card-head .head-actions')!.querySelectorAll('button')) as HTMLButtonElement[])
+    .filter((b) => b.style.display !== 'none')
+    .map((b) => b.textContent)
+    .join(','),
+  'Clear,Import,Export',
+);
+click('Export');
+URL.createObjectURL = realCreate;
+HTMLAnchorElement.prototype.click = realAnchorClick;
+check('export downloads a recipe file', downloadName, 'new-brand-recipe.json');
+const exportedRecipe = JSON.parse(await (downloadBlob as Blob | null)!.text());
+check('export is a recipe file', exportedRecipe.format, 'palette-maker-recipe');
+check('export carries the rules', JSON.stringify(exportedRecipe.primary['tint-2']), '{"white":88}');
+check('export carries the fixed colors', exportedRecipe.tertiaryDefault?.base, '#333333');
+
+// Another import replaces it; a broken one is refused without touching the recipe.
+await pick('mine.json', JSON.stringify({ ...exportedRecipe, primary: { ...exportedRecipe.primary, 'tint-1': { step: 9 } } }));
+check('import applies the recipe', marker('primary-tint-1')?.style.left, '9%');
+check('import updates the dots', marker('primary-tint-1')?.title.endsWith('(step 09)'), true);
+check('a fresh import has nothing to reset', resetShown('New brand'), false);
+await pick('broken.json', '{"primary": {}}');
+check('broken import keeps the recipe', marker('primary-tint-1')?.style.left, '9%');
+check('broken import says why', last('notify')?.message, 'broken.json: primary tint-1 is missing');
+check('as an error toast', last('notify')?.error, true);
 
 // Theme tab lists every variable, and the export has the DDS shape.
-openTab('Theme');
-check('theme table has 21 rows', $$('.token').length, 21);
-const brandJson = JSON.parse(($('#brand-export') as HTMLTextAreaElement).value);
+check('theme table lists the 20 colors', $$('.token').length, 20);
+check('no root theme row', $$('.token-group').map((g) => g.textContent).join(','), 'Primary,Secondary,Tertiary');
+check('the theme list follows the recipe card', Boolean($('#panels .theme-host .token')), true);
+check('no JSON box in the panel', Boolean($('#panels textarea')), false);
+let copied = '';
+const realExec = document.execCommand;
+(document as unknown as { execCommand: () => boolean }).execCommand = () => {
+  copied = ($('textarea.clipboard') as HTMLTextAreaElement | null)?.value ?? '';
+  return true;
+};
+click('Copy JSON');
+(document as unknown as { execCommand: typeof realExec }).execCommand = realExec;
+check('copy sits on the theme heading', Boolean($('.card-head .head-actions button')), true);
+check('copy leaves no textarea behind', Boolean($('textarea.clipboard')), false);
+const brandJson = JSON.parse(copied);
 check('export keyed by brand', Object.keys(brandJson).join(','), 'new-brand');
 check('export alpha slot', brandJson['new-brand'].primary['primary-base-alpha-12'].$value, 'rgba(127,83,239,0.12)');
 
@@ -252,36 +389,50 @@ click('Create variables');
 const brandVars = last('create-brand-variables');
 check('create-brand-variables sent', brandVars?.type, 'create-brand-variables');
 check('theme carries 20 slots', (brandVars?.theme as { slots: unknown[] })?.slots?.length, 20);
-check('default collection', brandVars?.collectionName, '🌈 Theme');
+check('no collection field in the panel', rowNamed('Collection'), undefined);
+check('collection comes from the brand name', (brandVars?.theme as { name: string })?.name, 'New brand');
 
 click('Create documentation');
 check('create-brand-doc sent', last('create-brand-doc')?.type, 'create-brand-doc');
 
+// The recipe is saved with the rest of the Brand settings (clientStorage, per user).
 await wait(300);
-const saved = last('save-brand') as { brand: { input: { primary: string } }; tool: string } | undefined;
+// Snapshot it: the stub postMessage passes the live object, where Figma's would copy it.
+const saved = JSON.parse(JSON.stringify(last('save-brand'))) as
+  | { brand: { input: { primary: string }; recipe: unknown; imported: { name: string } }; tool: string }
+  | undefined;
 check('brand settings saved', saved?.brand?.input?.primary, '#7F53EF');
+check('recipe saved', Boolean(saved?.brand?.recipe), true);
+check('imported name saved', saved?.brand?.imported?.name, 'New brand');
 check('tool saved', saved?.tool, 'brand');
 
-// A restore from an older build without a recipe falls back to the fit.
-window.dispatchEvent(
-  new MessageEvent('message', {
-    data: {
-      pluginMessage: {
-        type: 'restore-config',
-        config: null,
-        tool: 'brand',
-        brand: { input: { name: 'Saved', primary: '#00a049', secondary: '#1672dd' }, collectionName: '' },
-      },
-    },
-  }),
-);
-openTab('Colors');
-check('restored brand name', ($('.row input[type="text"]') as HTMLInputElement).value, 'Saved');
-check('restored primary', hexFields()[0].value, '#00A049');
+// Clear removes the recipe, saved copy included, and leaves the colors.
+click('Clear');
+check('clear empties the recipe tab', recipeEmptyState(), 'Import recipe');
+check('clear removes the strips', $$('.spectrum').length, 0);
+check('nothing to create after clear', footerButtons().every((b) => b.disabled), true);
+check('clear keeps the colors', hexFields()[0].value, '7F53EF');
+await wait(300);
+check('clear is saved', (last('save-brand') as { brand: { recipe: unknown } } | undefined)?.brand?.recipe, null);
+
+// Restoring settings without a recipe stays headless; with one, it comes straight back.
+const restore = (brand: unknown) =>
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: { pluginMessage: { type: 'restore-config', config: null, tool: 'brand', brand } },
+    }),
+  );
+restore({ input: { name: 'Saved', primary: '#00a049', secondary: '#1672dd' } });
+check('restored brand name', nameField().value, 'Saved');
+check('restored primary', hexFields()[0].value, '00A049');
+check('no saved recipe stays headless', previewEmpty() && recipeEmptyState() === 'Import recipe', true);
+restore(saved?.brand);
+check('saved recipe comes back', $$('.spectrum').length, 3);
 
 // Back to curves: the curve tool is untouched.
 tools()[0].click();
 check('curves pressed again', tools()[0].getAttribute('aria-pressed'), 'true');
+check('brand fields leave with the tool', $('#form')?.children.length, 0);
 check('ramp is back', $$('.ramp > div').length, 8);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);

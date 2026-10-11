@@ -1,17 +1,18 @@
 /**
  * Refit the DDS brand recipe from test/fixtures/dds-themes.json.
  *
- *   bun scripts/fit-recipe.ts
+ *   bun scripts/fit-recipe.ts           print the comparison and the fitted recipe
+ *   bun scripts/fit-recipe.ts --write   also rewrite recipes/dds.json, the DDS recipe to import
  *
  * For every derived slot this compares two models by leave-one-brand-out cross-validation
  * and keeps the one that better predicts a brand it was not fitted on:
  *   step  lighten (tints) or darken (shades) until the color lands on a fixed DDS step
  *   mix   a fixed share of white (tints) or black (shades)
  * Slots that reuse another slot's color are dropped first: a collapsed slot says nothing
- * about the recipe. Prints the comparison and the recipe to paste into DDS_RECIPE.
+ * about the recipe.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   BrandRecipe,
@@ -21,10 +22,11 @@ import {
   contrastRatio,
   deltaE,
   parseHex,
+  recipeToJson,
   round8,
   stepOf,
 } from '../src/brand';
-import { Rgb, rgbToOklch } from '../src/oklch';
+import { Rgb, rgbToHex, rgbToOklch } from '../src/oklch';
 
 export interface DdsFixture {
   source: string;
@@ -199,6 +201,7 @@ export function fitRecipe(fixture: DdsFixture) {
   let darkMax = 0;
   let whiteMin = Infinity;
   const white: Rgb = { r: 1, g: 1, b: 1 };
+  const darkRefs = new Map<string, number>();
   for (const theme of Object.values(fixture.themes)) {
     for (const group of ['primary', 'secondary'] as const) {
       const baseRef = theme[group]?.[`${group}-base`];
@@ -206,12 +209,18 @@ export function fitRecipe(fixture: DdsFixture) {
       if (!baseRef || !onRef) continue;
       const ratio = contrastRatio(white, colorOf(fixture, baseRef));
       if (onRef === 'neutral.white') whiteMin = Math.min(whiteMin, ratio);
-      else darkMax = Math.max(darkMax, ratio);
+      else {
+        darkMax = Math.max(darkMax, ratio);
+        darkRefs.set(onRef, (darkRefs.get(onRef) ?? 0) + 1);
+      }
     }
   }
   const middle = (darkMax + whiteMin) / 2;
   const rounded = Math.round(middle * 2) / 2;
   const onContrast = rounded > darkMax && rounded <= whiteMin ? rounded : Number(middle.toFixed(2));
+
+  // The dark on-color the DDS uses where white does not reach the threshold.
+  const [onDarkRef] = [...darkRefs.entries()].sort((a, b) => b[1] - a[1])[0];
 
   const tertiaryStep = (key: string): SlotRule => ({
     kind: 'step',
@@ -238,7 +247,16 @@ export function fitRecipe(fixture: DdsFixture) {
       'shade-1': tertiaryStep('tertiary-shade-1'),
     },
     onContrast,
+    onDark: rgbToHex(colorOf(fixture, onDarkRef)),
     alpha: 0.12,
+    // The tertiary most DDS brands share, used as is when no tertiary color is picked.
+    tertiaryDefault: {
+      base: rgbToHex(commonTertiary(fixture, 'tertiary-base')),
+      'tint-1': rgbToHex(commonTertiary(fixture, 'tertiary-tint-1')),
+      'tint-2': rgbToHex(commonTertiary(fixture, 'tertiary-tint-2')),
+      'shade-1': rgbToHex(commonTertiary(fixture, 'tertiary-shade-1')),
+      on: rgbToHex(commonTertiary(fixture, 'on-tertiary')),
+    },
   };
 
   return { recipe, rows, onRange: { darkMax, whiteMin } };
@@ -325,5 +343,22 @@ if (import.meta.main) {
   console.log(
     `\non-color: dark text up to ${onRange.darkMax.toFixed(2)}:1, white from ${onRange.whiteMin.toFixed(2)}:1, threshold ${recipe.onContrast}`,
   );
-  console.log('\nDDS_RECIPE =', JSON.stringify(recipe, null, 2));
+  const file = recipeToJson(recipe, {
+    name: 'DDS fit',
+    description:
+      `Fitted to the ${Object.keys(fixture.themes).length} DDS brand themes` +
+      (fixture.commit ? ` (tokens commit ${fixture.commit.slice(0, 7)})` : '') +
+      ' by scripts/fit-recipe.ts. step: mix until the color lands on that DDS step. ' +
+      'white / black: share of white in a tint or black in a shade, in percent. ' +
+      'onContrast: white text from this contrast ratio up, onDark below it. ' +
+      'alpha: opacity of the base-alpha-12 slots, in percent. ' +
+      'tertiaryDefault: the fixed tertiary used when no tertiary color is picked.',
+  });
+  if (process.argv.includes('--write')) {
+    const out = resolve(import.meta.dir, '../recipes/dds.json');
+    await writeFile(out, file);
+    console.log(`\nwrote ${out}`);
+  } else {
+    console.log('\nrecipes/dds.json would be:\n' + file);
+  }
 }

@@ -46,6 +46,8 @@
     --elevation-100: 0px 1px 3px 0px #00000026, 0px 0px 0.5px 0px #0000004d;
 
     --pad: clamp(8px, 2.5vw, 16px);
+    /* One height for every strip and strip-styled slider in the Brand tool. */
+    --strip-h: clamp(16px, 3.4vh, 28px);
     --label: clamp(52px, 16vw, 72px);
   }
   /* Figma tags the iframe's <html> with figma-dark when themeColors is on. */
@@ -88,6 +90,10 @@
   /* Tool switch, preview, tabs and footer are pinned; only the middle region scrolls. */
   #tool { flex: 0 0 auto; padding: var(--spacer-2) var(--pad) 0; }
   #preview { flex: 0 0 auto; padding: var(--spacer-2) var(--pad) 0; }
+  #preview:empty { display: none; }
+  /* Brand fields: pinned under the preview, empty (and gone) in the Curves tool. */
+  #form { flex: 0 0 auto; padding: var(--spacer-2) var(--pad) var(--spacer-2-5); }
+  #form:empty { display: none; }
   #tabs {
     flex: 0 0 auto;
     display: flex;
@@ -95,6 +101,7 @@
     padding: var(--spacer-2) var(--pad);
     border-bottom: 1px solid var(--color-border);
   }
+  #tabs:empty { display: none; }
   #panels {
     flex: 1 1 auto;
     overflow-y: auto;
@@ -123,7 +130,9 @@
   }
   /* Figma separates property sections with hairlines, not boxed cards. */
   .card { padding: 0 0 var(--spacer-2); }
-  .card + .card { border-top: 1px solid var(--color-border); }
+  .card + .card, .card + .theme-host > .card { border-top: 1px solid var(--color-border); }
+  /* Without the tab strip's hairline, the panel itself starts the section. */
+  #tabs:empty + #panels { border-top: 1px solid var(--color-border); }
   #preview .card { padding: 0; }
 
   /* Label / control / readout. Only the control is allowed to shrink. */
@@ -379,16 +388,8 @@
     scrollbar-color: var(--color-scrollbar) transparent;
   }
   textarea:focus { border-color: var(--color-border-selected); }
-  #status {
-    min-height: var(--text-line);
-    margin-top: var(--spacer-1);
-    color: var(--color-text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  #status:empty { display: none; }
-  #status[data-error="true"] { color: var(--color-text-danger); }
+  /* The copy helper's textarea never shows. */
+  textarea.clipboard { position: fixed; top: -1000px; left: 0; width: 1px; height: 1px; opacity: 0; }
 
   /*
    * Resize affordances. Figma exposes no native window resizing, so the edges of
@@ -435,10 +436,16 @@
   }
 
   /* Brand preview: one white -> base -> black strip per group, a dot per slot. */
-  .spectra { display: flex; flex-direction: column; gap: var(--spacer-2); }
-  .spectrum-row { display: flex; align-items: center; gap: var(--spacer-2); }
+  /* The bottom margin stands in for the curve preview's meta line before the tabs. */
+  .spectra { display: flex; flex-direction: column; gap: var(--spacer-2-5); }
+  /* Strips then the strip-styled sliders: one column, one gap between every row. */
+  .recipe-rows { display: flex; flex-direction: column; gap: var(--spacer-2-5); margin: var(--spacer-1) 0 var(--spacer-3); }
+  .strips:empty { display: none; }
+  /* Label on top, bar full width below, like the color fields. */
+  .spectrum-row { display: flex; flex-direction: column; gap: var(--spacer-1); }
+  .spectrum-row > .spectrum,
+  .spectrum-row > .strip-field { flex: none; width: 100%; }
   .spectrum-row > .name {
-    flex: 0 0 var(--label);
     color: var(--color-text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -447,9 +454,63 @@
   .spectrum {
     position: relative;
     flex: 1 1 auto;
-    height: clamp(16px, 3.4vh, 28px);
+    height: var(--strip-h);
     border-radius: var(--radius-medium);
     box-shadow: inset 0 0 0 1px var(--swatch-outline);
+  }
+
+  /*
+   * A range input drawn as a strip: the bar comes from --track, the thumb is the same dot
+   * as the strips' markers, filled with --dot.
+   */
+  .strip-field { position: relative; flex: 1 1 auto; display: flex; }
+  /* The value sits inside the bar, at its right end, out of the thumb's way. */
+  .strip-value {
+    position: absolute;
+    right: var(--spacer-2);
+    top: 50%;
+    transform: translateY(-50%);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-secondary);
+    pointer-events: none;
+  }
+  input[type="range"].strip-range {
+    flex: 1 1 auto;
+    height: var(--strip-h);
+    border-radius: var(--radius-medium);
+    cursor: ew-resize;
+  }
+  input[type="range"].strip-range::-webkit-slider-runnable-track {
+    height: var(--strip-h);
+    border-radius: var(--radius-medium);
+    background: var(--track);
+    box-shadow: inset 0 0 0 1px var(--swatch-outline);
+  }
+  input[type="range"].strip-range::-webkit-slider-thumb {
+    width: 10px;
+    height: 10px;
+    margin-top: calc((var(--strip-h) - 10px) / 2);
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgb(0 0 0 / 0.2);
+  }
+  input[type="range"].strip-range:focus-visible::-webkit-slider-thumb,
+  input[type="range"].strip-range:active::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color-border-selected);
+  }
+  input[type="range"].strip-range::-moz-range-track {
+    height: var(--strip-h);
+    border-radius: var(--radius-medium);
+    background: var(--track);
+  }
+  input[type="range"].strip-range::-moz-range-progress { background: transparent; }
+  input[type="range"].strip-range::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgb(0 0 0 / 0.2);
   }
   .marker {
     position: absolute;
@@ -463,10 +524,85 @@
     transition: transform 80ms ease;
   }
   .marker:hover { transform: scale(1.35); z-index: 1; }
+  /* A dot that edits the recipe: grab it, or focus it and use the arrow keys. */
+  .marker.draggable { cursor: ew-resize; touch-action: none; outline: none; }
+  .marker.draggable:focus-visible,
+  .marker.draggable[data-dragging] {
+    transform: scale(1.35);
+    z-index: 1;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color-border-selected);
+  }
+  body .marker[data-dragging] { transition: none; }
+
+  /* The three brand colors side by side; they wrap to fewer columns in a narrow window. */
+  .color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: var(--spacer-2);
+  }
+  .color-grid + .row { margin-top: var(--spacer-2); }
+  .color-cell { display: flex; flex-direction: column; gap: var(--spacer-1); }
+  .color-cell > label { color: var(--color-text-secondary); }
 
   /* Color input: a 24px swatch button next to a hex field. */
-  .color-field { flex: 1 1 auto; display: flex; align-items: center; gap: var(--spacer-1); }
-  .color-field input[type="text"] { font-variant-numeric: tabular-nums; text-transform: uppercase; }
+  /*
+   * Figma's own color field: one filled box, the swatch inside on the left, the hex beside
+   * it without a "#". Borderless until hover, brand border while editing, like the inputs.
+   */
+  .color-field {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--spacer-1);
+    height: var(--spacer-4);
+    padding-left: 4px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-medium);
+    background: var(--color-bg-secondary);
+  }
+  .color-field:hover { border-color: var(--color-border); }
+  .color-field:focus-within { border-color: var(--color-border-selected); }
+  .color-field input[type="color"] {
+    width: 16px;
+    height: 16px;
+    border: none;
+    border-radius: var(--radius-small);
+    box-shadow: inset 0 0 0 1px var(--swatch-outline);
+  }
+  .color-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .color-field input[type="color"]::-webkit-color-swatch { border-radius: var(--radius-small); }
+  .color-field input[type="text"] {
+    height: 100%;
+    padding: 0 4px 0 0;
+    border: none;
+    background: transparent;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+  }
+  .color-field input[type="text"]:hover,
+  .color-field input[type="text"]:focus { border: none; }
+  /* No color yet: the swatch previews the placeholder, faded. */
+  .color-field.empty input[type="color"] { opacity: 0.35; }
+  .color-field input[type="text"]::placeholder { text-transform: none; }
+
+  /* A section title with its actions on the right, like Figma's panel headers. */
+  .card-head { display: flex; align-items: center; gap: var(--spacer-2); min-height: 40px; }
+  .card-head > h2 { flex: 1 1 auto; }
+  /* Actions keep to the right, with or without a title beside them. */
+  .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--spacer-1); margin-left: auto; }
+  .head-actions > button { flex: 0 0 auto; }
+
+  /* Nothing to show yet: a line of guidance, maybe an action. */
+  .empty-state {
+    padding: var(--spacer-4) var(--spacer-3);
+    text-align: center;
+    color: var(--color-text-secondary);
+  }
+  .empty-state p { margin: 0 auto; max-width: 300px; }
+  .empty-state .linkrow { justify-content: center; margin-top: var(--spacer-3); }
+  .empty-state .linkrow > button { flex: 0 1 auto; min-width: 120px; }
+
+  button:disabled { opacity: 0.4; pointer-events: none; }
   input[type="color"] {
     flex: 0 0 auto;
     width: var(--spacer-4);
@@ -492,6 +628,8 @@
     margin: var(--spacer-2) 0 var(--spacer-1);
     color: var(--color-text-tertiary);
   }
+  /* The first group label sits right under its heading row. */
+  .card-head + .token-group { margin-top: 0; }
   .token {
     display: flex;
     align-items: center;
@@ -506,13 +644,6 @@
       linear-gradient(var(--chip), var(--chip)),
       repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 8px 8px;
     box-shadow: inset 0 0 0 1px var(--swatch-outline);
-  }
-  .chip.text {
-    display: grid;
-    place-items: center;
-    background: var(--color-bg-secondary);
-    font-size: 9px;
-    color: var(--color-text-secondary);
   }
   .token > .key { flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .token > .hex {
@@ -542,6 +673,7 @@
   }
 </style>
 <div id="tool"></div>
+<div id="form"></div>
 <div id="preview"></div>
 <div id="tabs"></div>
 <div id="panels"></div>

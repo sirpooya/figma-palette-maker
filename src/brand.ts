@@ -9,8 +9,10 @@
  *      same gamma-encoded space. Luma is linear there, so a mix moves the step linearly
  *      and "lighten to step n" has a closed form.
  *
- * DDS_RECIPE holds the fitted constants. scripts/fit-recipe.ts derives them from
- * test/fixtures/dds-themes.json, and test/brand.ts fails if the two drift apart.
+ * The engine is headless: it holds no recipe and no colors of its own. Every number and
+ * every fixed color comes from a recipe file the user imports. The DDS one is
+ * recipes/dds.json, fitted from test/fixtures/dds-themes.json by scripts/fit-recipe.ts
+ * (`--write` rewrites it); test/brand.ts fails if the two drift apart.
  */
 
 import { Rgb, clamp01, rgbToHex, rgbToOklch } from './oklch';
@@ -29,54 +31,158 @@ export type SlotPart = DerivedPart | 'gradient' | 'base' | 'alpha' | 'on';
  */
 export type SlotRule = { kind: 'step'; step: number } | { kind: 'mix'; amount: number };
 
+/** A fixed tertiary set, used as is when the tertiary color is left empty or set to its base. */
+export type TertiaryDefault = Record<'base' | 'tint-1' | 'tint-2' | 'shade-1' | 'on', string>;
+
 export interface BrandRecipe {
   primary: Record<'tint-1' | 'tint-2' | 'tint-3' | 'shade-2' | 'shade-1', SlotRule>;
   secondary: Record<'tint-1' | 'tint-2' | 'shade-1', SlotRule>;
-  /** Only used for a custom tertiary; the default tertiary is the DDS neutral set. */
+  /** For a tertiary color other than `tertiaryDefault.base`. */
   tertiary: Record<'tint-1' | 'tint-2' | 'shade-1', SlotRule>;
   /** White text and icons when white on the base reaches this contrast ratio. */
   onContrast: number;
+  /** Text and icons on bases below the threshold (DDS: neutral-96). */
+  onDark: string;
   /** Opacity of the `*-base-alpha-12` slots. */
   alpha: number;
+  /** The tertiary set to use when no tertiary color is given (DDS: its neutrals), or null. */
+  tertiaryDefault: TertiaryDefault | null;
 }
 
+const TERTIARY_DEFAULT_KEYS: Array<keyof TertiaryDefault> = ['base', 'tint-1', 'tint-2', 'shade-1', 'on'];
+
+/* -------------------------------------------------------------------------- */
+/* Recipe files                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** Marks a JSON file as a Palette Maker recipe. */
+export const RECIPE_FORMAT = 'palette-maker-recipe';
+export const RECIPE_VERSION = 1;
+
+/** The slots a recipe sets, per group, in file order. */
+export const RECIPE_SLOTS: Record<BrandGroup, DerivedPart[]> = {
+  primary: ['tint-1', 'tint-2', 'tint-3', 'shade-2', 'shade-1'],
+  secondary: ['tint-1', 'tint-2', 'shade-1'],
+  tertiary: ['tint-1', 'tint-2', 'shade-1'],
+};
+
 /**
- * Fitted against the 20 DDS brand themes by scripts/fit-recipe.ts. Do not hand-tune:
- * refit, then copy the printed recipe here.
+ * A recipe as a file: `{ "step": 3 }`, `{ "white": 88 }` (tints) or `{ "black": 55 }`
+ * (shades) per slot, percentages for mixes and alpha, and optional name/description.
  */
-export const DDS_RECIPE: BrandRecipe = {
-  primary: {
-    'tint-1': { kind: 'step', step: 3 },
-    'tint-2': { kind: 'mix', amount: 0.88 },
-    'tint-3': { kind: 'step', step: 21 },
-    'shade-2': { kind: 'mix', amount: 0.2 },
-    'shade-1': { kind: 'mix', amount: 0.55 },
-  },
-  secondary: {
-    'tint-1': { kind: 'step', step: 4 },
-    'tint-2': { kind: 'mix', amount: 0.68 },
-    'shade-1': { kind: 'mix', amount: 0.41 },
-  },
-  tertiary: {
-    'tint-1': { kind: 'step', step: 7 },
-    'tint-2': { kind: 'step', step: 48 },
-    'shade-1': { kind: 'step', step: 96 },
-  },
-  onContrast: 2,
-  alpha: 0.12,
-};
+export function recipeToJson(
+  recipe: BrandRecipe,
+  meta: { name?: string; description?: string } = {},
+): string {
+  const percent = (v: number) => Number((v * 100).toFixed(2));
+  const group = (g: BrandGroup) =>
+    Object.fromEntries(
+      RECIPE_SLOTS[g].map((part) => {
+        const rule = (recipe[g] as Record<string, SlotRule>)[part];
+        const toward = part.startsWith('tint') ? 'white' : 'black';
+        return [part, rule.kind === 'step' ? { step: rule.step } : { [toward]: percent(rule.amount) }];
+      }),
+    );
+  const text = JSON.stringify(
+    {
+      format: RECIPE_FORMAT,
+      version: RECIPE_VERSION,
+      ...(meta.name ? { name: meta.name } : {}),
+      ...(meta.description ? { description: meta.description } : {}),
+      primary: group('primary'),
+      secondary: group('secondary'),
+      tertiary: group('tertiary'),
+      onContrast: recipe.onContrast,
+      onDark: recipe.onDark,
+      alpha: percent(recipe.alpha),
+      ...(recipe.tertiaryDefault ? { tertiaryDefault: recipe.tertiaryDefault } : {}),
+    },
+    null,
+    2,
+  );
+  // One rule per line: `"tint-1": { "step": 3 }` reads and hand-edits better than three.
+  return text.replace(/\{\n\s+("(?:step|white|black)": -?[\d.]+)\n\s+\}/g, '{ $1 }') + '\n';
+}
 
-/** The DDS tertiary every brand shares (neutral 06-cold, 48, 80, 96, white). */
-export const DDS_NEUTRAL_TERTIARY: Record<'tint-1' | 'tint-2' | 'base' | 'shade-1' | 'on', string> = {
-  'tint-1': '#ECEDEF',
-  'tint-2': '#848484',
-  base: '#333333',
-  'shade-1': '#0A0A0A',
-  on: '#FFFFFF',
-};
+/** Read a recipe from parsed JSON. Strict: every slot must be there, in range. */
+export function recipeFromData(data: unknown): BrandRecipe {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('A recipe must be a JSON object');
+  }
+  const file = data as Record<string, unknown>;
+  if (file.format !== undefined && file.format !== RECIPE_FORMAT) {
+    throw new Error(`Not a Palette Maker recipe (format "${String(file.format)}")`);
+  }
+  if (typeof file.version === 'number' && file.version > RECIPE_VERSION) {
+    throw new Error(`This recipe needs a newer Palette Maker (version ${file.version})`);
+  }
 
-/** Dark text for light bases: DDS neutral-96. */
-export const DDS_ON_DARK = '#0A0A0A';
+  const number = (value: unknown, label: string, min: number, max: number): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+      throw new Error(`${label} must be a number from ${min} to ${max}`);
+    }
+    return value;
+  };
+
+  const rule = (value: unknown, label: string, toward: 'white' | 'black'): SlotRule => {
+    if (!value || typeof value !== 'object') throw new Error(`${label} is missing`);
+    const entry = value as Record<string, unknown>;
+    const keys = Object.keys(entry);
+    if (keys.length !== 1) throw new Error(`${label} needs exactly one of "step" or "${toward}"`);
+    if (keys[0] === 'step') return { kind: 'step', step: Math.round(number(entry.step, `${label} step`, 0, 100)) };
+    if (keys[0] === toward) {
+      return { kind: 'mix', amount: number(entry[toward], `${label} ${toward}`, 0, 100) / 100 };
+    }
+    throw new Error(`${label} takes "step" or "${toward}", not "${keys[0]}"`);
+  };
+
+  const group = (g: BrandGroup) => {
+    const source = file[g];
+    if (!source || typeof source !== 'object') throw new Error(`"${g}" is missing`);
+    return Object.fromEntries(
+      RECIPE_SLOTS[g].map((part) => [
+        part,
+        rule((source as Record<string, unknown>)[part], `${g} ${part}`, part.startsWith('tint') ? 'white' : 'black'),
+      ]),
+    );
+  };
+
+  const hex = (value: unknown, label: string): string => {
+    const color = typeof value === 'string' ? parseHex(value) : null;
+    if (!color) throw new Error(`${label} must be a hex color like "#0A0A0A"`);
+    return rgbToHex(color);
+  };
+
+  let tertiaryDefault: TertiaryDefault | null = null;
+  if (file.tertiaryDefault !== undefined && file.tertiaryDefault !== null) {
+    if (typeof file.tertiaryDefault !== 'object') throw new Error('tertiaryDefault must be an object');
+    const source = file.tertiaryDefault as Record<string, unknown>;
+    tertiaryDefault = Object.fromEntries(
+      TERTIARY_DEFAULT_KEYS.map((key) => [key, hex(source[key], `tertiaryDefault ${key}`)]),
+    ) as TertiaryDefault;
+  }
+
+  return {
+    primary: group('primary') as BrandRecipe['primary'],
+    secondary: group('secondary') as BrandRecipe['secondary'],
+    tertiary: group('tertiary') as BrandRecipe['tertiary'],
+    onContrast: number(file.onContrast, 'onContrast', 1, 21),
+    onDark: hex(file.onDark, 'onDark'),
+    alpha: number(file.alpha, 'alpha', 0, 100) / 100,
+    tertiaryDefault,
+  };
+}
+
+/** Read a recipe file's text. */
+export function parseRecipe(text: string): BrandRecipe {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('The recipe file is not valid JSON');
+  }
+  return recipeFromData(data);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Slots                                                                       */
@@ -219,9 +325,9 @@ export function contrastRatio(a: Rgb, b: Rgb): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** White when white on the base reaches the threshold, otherwise DDS neutral-96. */
-export function onColorFor(base: Rgb, threshold = DDS_RECIPE.onContrast): Rgb {
-  return contrastRatio(WHITE, base) >= threshold ? WHITE : (parseHex(DDS_ON_DARK) as Rgb);
+/** White when white on the base reaches the recipe's threshold, otherwise its dark color. */
+export function onColorFor(base: Rgb, recipe: Pick<BrandRecipe, 'onContrast' | 'onDark'>): Rgb {
+  return contrastRatio(WHITE, base) >= recipe.onContrast ? WHITE : (parseHex(recipe.onDark) as Rgb);
 }
 
 /** OKLab distance x100: 1 is roughly the smallest difference anyone notices. */
@@ -244,7 +350,10 @@ export interface BrandInput {
   name: string;
   primary: string;
   secondary: string;
-  /** Leave empty for the DDS neutral tertiary every brand shares. */
+  /**
+   * Empty, or the recipe's `tertiaryDefault.base`, gives that fixed set (the DDS neutrals in
+   * the DDS recipe); any other color runs through the tertiary rules.
+   */
   tertiary?: string | null;
   /** Leave empty to use the primary base, as most DDS brands do. */
   gradient?: string | null;
@@ -278,11 +387,22 @@ export const BRAND_LIGHT_TO_DARK: Record<BrandGroup, SlotPart[]> = {
   tertiary: ['tint-1', 'tint-2', 'base', 'shade-1'],
 };
 
-export function generateBrandTheme(input: BrandInput, recipe: BrandRecipe = DDS_RECIPE): BrandTheme {
+/** The tertiary color, or null when the recipe's fixed tertiary set applies. */
+function customTertiary(text: string | null | undefined, recipe: BrandRecipe): Rgb | null {
+  const fixed = recipe.tertiaryDefault;
+  if (!text?.trim()) {
+    if (!fixed) throw new Error('Pick a tertiary color: this recipe has no default tertiary');
+    return null;
+  }
+  const color = requireHex(text, 'Tertiary');
+  return fixed && rgbToHex(round8(color)) === fixed.base ? null : color;
+}
+
+export function generateBrandTheme(input: BrandInput, recipe: BrandRecipe): BrandTheme {
   const bases: Record<BrandGroup, Rgb | null> = {
     primary: requireHex(input.primary, 'Primary'),
     secondary: requireHex(input.secondary, 'Secondary'),
-    tertiary: input.tertiary?.trim() ? requireHex(input.tertiary, 'Tertiary') : null,
+    tertiary: customTertiary(input.tertiary, recipe),
   };
   const gradient = input.gradient?.trim() ? requireHex(input.gradient, 'Gradient') : null;
 
@@ -291,14 +411,15 @@ export function generateBrandTheme(input: BrandInput, recipe: BrandRecipe = DDS_
     const base = bases[spec.group];
     let color: Rgb;
     if (!base) {
-      // Only the tertiary can be missing, and then it is the shared DDS neutral set.
-      color = parseHex(DDS_NEUTRAL_TERTIARY[spec.part as keyof typeof DDS_NEUTRAL_TERTIARY]) as Rgb;
+      // Only the tertiary can be missing, and then it is the recipe's fixed set.
+      const fixed = recipe.tertiaryDefault as TertiaryDefault;
+      color = parseHex(fixed[spec.part as keyof TertiaryDefault]) as Rgb;
     } else if (spec.part === 'base' || spec.part === 'alpha') {
       color = base;
     } else if (spec.part === 'gradient') {
       color = gradient ?? base;
     } else if (spec.part === 'on') {
-      color = onColorFor(base, recipe.onContrast);
+      color = onColorFor(base, recipe);
     } else {
       const toward = spec.part.startsWith('tint') ? 'white' : 'black';
       color = applyRule(base, derivedRule(recipe, spec.group, spec.part), toward);

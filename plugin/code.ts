@@ -73,33 +73,30 @@ async function main(): Promise<void> {
         case 'create-swatches': {
           const frame = await paintSwatchRow(message.stops, { label: message.label });
           place(frame);
-          post({ type: 'done', message: `Created ${message.stops.length} swatches` });
+          figma.notify(`Created ${message.stops.length} swatches`);
           break;
         }
 
         case 'create-brand-variables': {
-          const result = await writeBrandTheme(message.theme, {
-            collectionName: message.collectionName,
-          });
-          const verb = result.addedMode ? 'Added' : 'Updated';
-          post({
-            type: 'done',
-            message:
-              `${verb} mode "${message.theme.name}" in ${result.collection.name}` +
-              (result.created ? `, ${result.created} new variables` : ''),
-          });
+          const result = await writeBrandTheme(message.theme);
+          const total = result.created + result.updated;
+          figma.notify(
+            result.created
+              ? `Created "${result.collection.name}" with ${total} variables`
+              : `Updated the ${total} variables in "${result.collection.name}"`,
+          );
           break;
         }
 
         case 'create-brand-doc': {
-          const { frame, bound } = await paintBrandDoc(message.theme, {
-            collectionName: message.collectionName,
-          });
+          const { frame, bound } = await paintBrandDoc(message.theme);
           place(frame);
-          post({
-            type: 'done',
-            message: `Created the ${message.theme.name} token sheet` + (bound ? ', bound to variables' : ''),
-          });
+          figma.notify(`Created the ${message.theme.name} token sheet` + (bound ? ', bound to variables' : ''));
+          break;
+        }
+
+        case 'notify': {
+          figma.notify(message.message, { error: message.error });
           break;
         }
 
@@ -115,10 +112,7 @@ async function main(): Promise<void> {
             groupName: message.groupName,
             modeName: message.modeName,
           });
-          post({
-            type: 'done',
-            message: `Wrote ${message.stops.length} variables to ${collection.name}`,
-          });
+          figma.notify(`Wrote ${message.stops.length} variables to ${collection.name}`);
           break;
         }
 
@@ -136,7 +130,6 @@ async function main(): Promise<void> {
       }
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error);
-      post({ type: 'error', message: text });
       figma.notify(text, { error: true });
     }
   };

@@ -2,20 +2,20 @@
  * Brand theme test: the DDS is the oracle. test/fixtures/dds-themes.json holds every DDS
  * core color and brand theme; this checks the step numbers against the DDS color names,
  * the recipe against every brand's hand-picked slots, the on-colors against all 40 bases,
- * and that DDS_RECIPE is still what a fresh fit of the fixture produces.
+ * and that recipes/dds.json is still what a fresh fit of the fixture produces.
  *
  * Run: bun test/brand.ts
  */
 
 import {
   BRAND_SLOTS,
-  DDS_NEUTRAL_TERTIARY,
-  DDS_RECIPE,
   THEME_NAME_VARIABLE,
   brandThemeToJson,
   deltaE,
   generateBrandTheme,
   parseHex,
+  parseRecipe,
+  recipeToJson,
   spectrum,
   stepOf,
 } from '../src/brand';
@@ -37,6 +37,9 @@ function atMost(label: string, actual: number, limit: number) {
 }
 
 const fixture = await loadFixture();
+// The engine has no built-in recipe; the DDS one is a file like any other.
+const ddsFile = await Bun.file(new URL('../recipes/dds.json', import.meta.url)).text();
+const DDS = parseRecipe(ddsFile);
 const hexOf = (ref: string) => rgbToHex(colorOf(fixture, ref));
 
 /* -------------------------------------------------------------------------- */
@@ -80,7 +83,7 @@ for (const [key, set] of samples) {
   const [group, part] = key.split('/');
   let sum = 0;
   for (const s of set) {
-    const theme = generateBrandTheme({ name: s.brand, primary: rgbToHex(s.base), secondary: rgbToHex(s.base) });
+    const theme = generateBrandTheme({ name: s.brand, primary: rgbToHex(s.base), secondary: rgbToHex(s.base) }, DDS);
     const slot = theme.slots.find((x) => x.group === group && x.part === part);
     sum += deltaE(parseHex(slot!.hex)!, s.target);
   }
@@ -95,7 +98,7 @@ for (const theme of Object.values(fixture.themes)) {
     const baseRef = theme[group]?.[`${group}-base`];
     const onRef = theme[group]?.[`on-${group}`];
     if (!baseRef || !onRef) continue;
-    const generated = generateBrandTheme({ name: 'x', primary: hexOf(baseRef), secondary: hexOf(baseRef) });
+    const generated = generateBrandTheme({ name: 'x', primary: hexOf(baseRef), secondary: hexOf(baseRef) }, DDS);
     const on = generated.slots.find((s) => s.key === `on-${group}`)!.hex;
     onTotal++;
     if (on === hexOf(onRef)) onMatches++;
@@ -103,12 +106,62 @@ for (const theme of Object.values(fixture.themes)) {
 }
 check('on-colors match the DDS', `${onMatches}/${onTotal}`, `${onTotal}/${onTotal}`);
 
-// DDS_RECIPE is a fit, not a guess: refitting the fixture must give the same recipe.
+// The DDS recipe is a fit, not a guess: refitting the fixture must give the same recipe.
 const refit = fitRecipe(fixture);
-check('DDS_RECIPE equals a fresh fit', JSON.stringify(DDS_RECIPE), JSON.stringify(refit.recipe));
+check('recipes/dds.json equals a fresh fit', JSON.stringify(DDS), JSON.stringify(refit.recipe));
+// The default recipe is a file, not code, and recipe files round-trip.
+check('recipe files round-trip', JSON.stringify(parseRecipe(recipeToJson(DDS))), JSON.stringify(DDS));
+check('fit script output is the file', recipeToJson(refit.recipe, {
+  name: 'DDS fit',
+  description: JSON.parse(ddsFile).description,
+}), ddsFile);
+
+// Imports are strict: a broken file says what is wrong instead of half-applying.
+const good = JSON.parse(recipeToJson(DDS));
+const refusal = (data: unknown) => {
+  try {
+    parseRecipe(typeof data === 'string' ? data : JSON.stringify(data));
+    return '';
+  } catch (error) {
+    return (error as Error).message;
+  }
+};
+check('broken JSON is refused', refusal('{'), 'The recipe file is not valid JSON');
+check(
+  'a missing slot is named',
+  refusal({ ...good, primary: { ...good.primary, 'tint-3': undefined } }),
+  'primary tint-3 is missing',
+);
+check(
+  'a shade cannot mix white',
+  refusal({ ...good, primary: { ...good.primary, 'shade-1': { white: 40 } } }),
+  'primary shade-1 takes "step" or "black", not "white"',
+);
+check(
+  'out of range is refused',
+  refusal({ ...good, secondary: { ...good.secondary, 'tint-1': { step: 140 } } }),
+  'secondary tint-1 step must be a number from 0 to 100',
+);
+check('other formats are refused', refusal({ ...good, format: 'tokens' }), 'Not a Palette Maker recipe (format "tokens")');
+check('hand-written files may skip the header', refusal({ ...good, format: undefined, version: undefined }), '');
+check('onDark must be a color', refusal({ ...good, onDark: 'dark' }), 'onDark must be a hex color like "#0A0A0A"');
+check('tertiaryDefault is optional', refusal({ ...good, tertiaryDefault: undefined }), '');
+
+// Without a tertiaryDefault, the tertiary color is required rather than invented.
+const noFixedTertiary = { ...DDS, tertiaryDefault: null };
+const missingTertiary = (() => {
+  try {
+    generateBrandTheme({ name: 'x', primary: '#ed1944', secondary: '#1672dd' }, noFixedTertiary);
+    return '';
+  } catch (error) {
+    return (error as Error).message;
+  }
+})();
+check('no fixed tertiary asks for one', missingTertiary, 'Pick a tertiary color: this recipe has no default tertiary');
+
 check(
   'on threshold sits between the DDS cases',
-  DDS_RECIPE.onContrast > refit.onRange.darkMax && DDS_RECIPE.onContrast <= refit.onRange.whiteMin,
+  DDS.onContrast > refit.onRange.darkMax && DDS.onContrast <= refit.onRange.whiteMin,
   true,
 );
 
@@ -116,7 +169,7 @@ check(
 /* Shape of a generated theme                                                  */
 /* -------------------------------------------------------------------------- */
 
-const shop = generateBrandTheme({ name: 'Shop', primary: '#ed1944', secondary: '#1672dd' });
+const shop = generateBrandTheme({ name: 'Shop', primary: '#ed1944', secondary: '#1672dd' }, DDS);
 
 // The exact DDS 🌈 Theme variables, in the DDS order.
 const DDS_NAMES = [
@@ -141,7 +194,7 @@ check('base passes through untouched', shop.slots.find((s) => s.key === 'primary
 check('gradient defaults to the base', shop.slots.find((s) => s.key === 'primary-gradient')?.hex, '#ED1944');
 check(
   'gradient override is used',
-  generateBrandTheme({ name: 'x', primary: '#ed1944', secondary: '#1672dd', gradient: '#e40138' }).slots.find(
+  generateBrandTheme({ name: 'x', primary: '#ed1944', secondary: '#1672dd', gradient: '#e40138' }, DDS).slots.find(
     (s) => s.key === 'primary-gradient',
   )?.hex,
   '#E40138',
@@ -150,7 +203,20 @@ check('names its step like the DDS', shop.slots.find((s) => s.key === 'primary-b
 
 // Default tertiary is the DDS neutral set, and that set is what most DDS brands use.
 const tertiary = shop.slots.filter((s) => s.group === 'tertiary').map((s) => s.hex);
-check('default tertiary is the DDS neutrals', tertiary.join(','), Object.values(DDS_NEUTRAL_TERTIARY).join(','));
+const fixedTertiary = DDS.tertiaryDefault!;
+check(
+  'default tertiary is the recipe set',
+  tertiary.join(','),
+  [fixedTertiary['tint-1'], fixedTertiary['tint-2'], fixedTertiary.base, fixedTertiary['shade-1'], fixedTertiary.on].join(','),
+);
+check(
+  'tertiary #333333 keeps the exact neutrals',
+  generateBrandTheme({ name: 'x', primary: '#ed1944', secondary: '#1672dd', tertiary: '#333333' }, DDS)
+    .slots.filter((s) => s.group === 'tertiary')
+    .map((s) => s.hex)
+    .join(','),
+  tertiary.join(','),
+);
 const most = (key: string) => {
   const counts = new Map<string, number>();
   for (const t of Object.values(fixture.themes)) {
@@ -168,7 +234,7 @@ check(
 // A custom tertiary runs through the neutral steps instead: 7, 48, base, 96. A base
 // lighter than step 48 (this teal is 45) keeps tint-2 on the base, as the DDS collapses.
 const tertiarySteps = (hex: string) =>
-  generateBrandTheme({ name: 'x', primary: '#ed1944', secondary: '#1672dd', tertiary: hex })
+  generateBrandTheme({ name: 'x', primary: '#ed1944', secondary: '#1672dd', tertiary: hex }, DDS)
     .slots.filter((s) => s.group === 'tertiary' && s.part !== 'on')
     .map((s) => s.step)
     .join(',');
@@ -184,7 +250,7 @@ for (let h = 0; h < 360; h += 15) {
       g: Math.min(1, Math.max(0, l + 0.35 * Math.cos(((h - 120) * Math.PI) / 180))),
       b: Math.min(1, Math.max(0, l + 0.35 * Math.cos(((h + 120) * Math.PI) / 180))),
     });
-    const t = generateBrandTheme({ name: 'x', primary: hex, secondary: hex });
+    const t = generateBrandTheme({ name: 'x', primary: hex, secondary: hex }, DDS);
     const steps = (group: string, keys: string[]) =>
       keys.map((k) => t.slots.find((s) => s.key === `${group}-${k}`)!.step);
     const ordered = (xs: number[]) => xs.every((x, i) => i === 0 || xs[i - 1] <= x);
@@ -219,7 +285,7 @@ for (const name of ['shop', 'plus', 'ai', 'pharmacy', 'service-hub', 'super-coin
     name,
     primary: hexOf(theme.primary['primary-base']),
     secondary: hexOf(theme.secondary['secondary-base']),
-  });
+  }, DDS);
   const cells = ['tint-1', 'tint-2', 'tint-3', 'base', 'shade-2', 'shade-1'].map((part) => {
     const dds = stepOf(colorOf(fixture, theme.primary[`primary-${part}`]));
     const ours = generated.slots.find((s) => s.key === `primary-${part}`)!.step;

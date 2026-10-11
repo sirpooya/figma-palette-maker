@@ -12,17 +12,22 @@ import {
   BRAND_GROUPS,
   BRAND_LIGHT_TO_DARK,
   BrandGroup,
+  BrandRecipe,
   BrandTheme,
-  DDS_RECIPE,
   SlotRule,
+  brandSlug,
   brandThemeToJson,
   generateBrandTheme,
+  blackForStep,
   parseHex,
+  parseRecipe,
+  recipeToJson,
+  whiteForStep,
   spectrum,
   stepLabel,
 } from '../../src/brand';
 import { Channel, PRESET_LIST, PresetId } from '../../src/curves';
-import { rgbToHex } from '../../src/oklch';
+import { Rgb, rgbToHex } from '../../src/oklch';
 import {
   MAX_STOPS,
   MIN_STOPS,
@@ -62,6 +67,7 @@ const naming = { collectionName: 'Core', groupName: 'gray', modeName: 'Value' };
 
 const toolEl = document.getElementById('tool') as HTMLDivElement;
 const previewEl = document.getElementById('preview') as HTMLDivElement;
+const formEl = document.getElementById('form') as HTMLDivElement;
 const tabsEl = document.getElementById('tabs') as HTMLDivElement;
 const panelsEl = document.getElementById('panels') as HTMLDivElement;
 const footerEl = document.getElementById('footer') as HTMLDivElement;
@@ -70,11 +76,9 @@ function send(message: UiToPlugin) {
   parent.postMessage({ pluginMessage: message }, '*');
 }
 
+/** Feedback goes to Figma's own toast at the bottom of the canvas, not into the panel. */
 function setStatus(text: string, isError = false) {
-  const el = document.getElementById('status');
-  if (!el) return;
-  el.textContent = text;
-  el.dataset.error = String(isError);
+  if (text) send({ type: 'notify', message: text, error: isError });
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -380,7 +384,6 @@ function renderFooter() {
   footerEl.innerHTML = '';
   footerEl.append(
     el('div', { className: 'actions' }, [swatches, variables]),
-    el('div', { id: 'status' }),
   );
 }
 
@@ -388,13 +391,11 @@ function renderFooter() {
 /* Brand tool                                                                  */
 /* -------------------------------------------------------------------------- */
 
-type BrandTab = 'colors' | 'recipe' | 'theme';
-
-const BRAND_TAB_LABELS: Record<BrandTab, string> = {
-  colors: 'Colors',
-  recipe: 'Recipe',
-  theme: 'Theme',
-};
+/*
+ * Headless: the plugin ships no recipe and no colors. Nothing generates until the user
+ * imports a recipe file, which is then kept in clientStorage (on their machine) with the
+ * rest of the Brand settings. The DDS recipe is recipes/dds.json in the repo.
+ */
 
 const GROUP_LABELS: Record<BrandGroup, string> = {
   primary: 'Primary',
@@ -410,42 +411,52 @@ const PART_LABELS: Record<string, string> = {
   'shade-1': 'Shade 1',
 };
 
-const DEFAULT_COLLECTION = '🌈 Theme';
+/** Hints only: shown in the empty fields, never used as values. */
+const PLACEHOLDERS = { name: 'Brand name', primary: '#ED1944', secondary: '#1672DD', tertiary: '#333333' };
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 function defaultBrand(): BrandSettings {
   return {
-    input: { name: 'New brand', primary: '#ED1944', secondary: '#1672DD', tertiary: '', gradient: '' },
-    recipe: clone(DDS_RECIPE),
-    collectionName: DEFAULT_COLLECTION,
+    input: { name: '', primary: '', secondary: '', tertiary: '' },
+    recipe: null,
+    imported: null,
   };
 }
 
-/** Settings saved by an older build may lack fields; fill the gaps from the defaults. */
+/** A recipe from storage, checked through the file format; anything malformed is dropped. */
+function storedRecipe(value: unknown): BrandRecipe | null {
+  try {
+    return value ? parseRecipe(recipeToJson(value as BrandRecipe)) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Settings saved by an older build may lack fields; fill the gaps, never invent a recipe. */
 function restoreBrand(saved: BrandSettings): BrandSettings {
-  const fallback = defaultBrand();
-  const r = saved.recipe;
-  const recipeOk = Boolean(
-    r?.primary?.['tint-3'] &&
-      r?.secondary?.['tint-2'] &&
-      r?.tertiary?.['shade-1'] &&
-      typeof r?.onContrast === 'number' &&
-      typeof r?.alpha === 'number',
-  );
+  const recipe = storedRecipe(saved.recipe);
+  const importedRecipe = storedRecipe(saved.imported?.recipe);
   return {
-    input: { ...fallback.input, ...saved.input },
-    recipe: recipeOk ? r : fallback.recipe,
-    collectionName: saved.collectionName || fallback.collectionName,
+    input: { ...defaultBrand().input, ...saved.input, gradient: '' },
+    recipe,
+    imported:
+      recipe && importedRecipe
+        ? { name: String(saved.imported?.name || 'imported recipe'), recipe: importedRecipe }
+        : recipe
+          ? { name: 'imported recipe', recipe: clone(recipe) }
+          : null,
   };
 }
 
 let tool: Tool = 'curves';
-let brandTab: BrandTab = 'colors';
 let brand: BrandSettings = defaultBrand();
-let brandTheme: BrandTheme = generateBrandTheme(brand.input, brand.recipe);
+let brandTheme: BrandTheme | null = null;
+/** Why there is no theme yet: no recipe, or colors still to fill in. */
+let brandNotice = '';
 let brandError = '';
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+const brandActions: HTMLButtonElement[] = [];
 
 /** Debounced: a color picker drag fires dozens of inputs a second. */
 function saveBrand() {
@@ -456,15 +467,76 @@ function saveBrand() {
   }, 200);
 }
 
-/** Keep the last good theme when an input is invalid, and say why. */
 function regenerate() {
+  brandTheme = null;
+  brandError = '';
+  brandNotice = '';
+  if (!brand.recipe) {
+    brandNotice = 'Import a recipe to start.';
+    return;
+  }
+  const missing = [
+    !brand.input.name.trim() && 'a brand name',
+    !brand.input.primary.trim() && 'a primary color',
+    !brand.input.secondary.trim() && 'a secondary color',
+  ].filter((x): x is string => Boolean(x));
+  if (missing.length) {
+    const list = missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0];
+    brandNotice = `Add ${list}.`;
+    return;
+  }
   try {
     brandTheme = generateBrandTheme(brand.input, brand.recipe);
-    brandError = '';
   } catch (error) {
     brandError = error instanceof Error ? error.message : String(error);
   }
 }
+
+/* Recipe files -------------------------------------------------------------- */
+
+/** One hidden file input serves every "Import recipe" button. */
+const recipeFile = el('input', { type: 'file', accept: '.json,application/json' });
+recipeFile.hidden = true;
+document.body.append(recipeFile);
+
+// Import replaces the whole recipe or nothing: parseRecipe refuses a file with any missing
+// or out-of-range slot and says which one.
+recipeFile.onchange = async () => {
+  const picked = recipeFile.files?.[0];
+  recipeFile.value = '';
+  if (!picked) return;
+  try {
+    const text = await picked.text();
+    const recipe = parseRecipe(text);
+    const named = (JSON.parse(text) as { name?: unknown }).name;
+    const name = typeof named === 'string' && named.trim() ? named.trim() : picked.name.replace(/\.json$/i, '');
+    brand.recipe = recipe;
+    brand.imported = { name, recipe: clone(recipe) };
+    render();
+    saveBrand();
+    setStatus(`Imported the recipe from ${picked.name}`);
+  } catch (error) {
+    setStatus(`${picked.name}: ${error instanceof Error ? error.message : String(error)}`, true);
+  }
+};
+
+function importButton(label = 'Import recipe'): HTMLButtonElement {
+  const button = el('button', { textContent: label });
+  button.onclick = () => recipeFile.click();
+  return button;
+}
+
+/** Hand a text file to the user; Figma's plugin iframe allows downloads. */
+function downloadText(filename: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const link = el('a', { href: url, download: filename });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* Shell --------------------------------------------------------------------- */
 
 function renderTool() {
   const bar = el('div', { className: 'toolbar' });
@@ -486,22 +558,147 @@ function renderTool() {
   toolEl.append(bar);
 }
 
-/** One spectrum per group: the white -> base -> black path, a marker on every slot. */
-function renderBrandPreview() {
-  const meta = el('div', { className: 'meta' });
-  const summary = () => {
-    meta.innerHTML = '';
-    meta.append(
-      el('span', { textContent: brandTheme.name }),
-      el('span', { textContent: `${brandTheme.slots.length} colors + theme name` }),
-    );
+/** A short, centered message in place of a panel that has nothing to show yet. */
+function emptyState(text: string, actions: HTMLElement[] = []): HTMLElement {
+  return el('div', { className: 'empty-state' }, [
+    el('p', { textContent: text }),
+    ...(actions.length ? [el('div', { className: 'linkrow' }, actions)] : []),
+  ]);
+}
+
+/** The recipe rule behind a dot, or null for the base and for a fixed tertiary set. */
+function ruleFor(group: BrandGroup, part: string): SlotRule | null {
+  const recipe = brand.recipe;
+  if (!recipe) return null;
+  if (group === 'tertiary' && tertiaryIsFixed()) return null;
+  return (recipe[group] as Record<string, SlotRule>)[part] ?? null;
+}
+
+/** True when the tertiary is the recipe's fixed set: left empty, or set to its base. */
+function tertiaryIsFixed(): boolean {
+  const fixed = brand.recipe?.tertiaryDefault;
+  if (!fixed) return false;
+  const typed = brand.input.tertiary?.trim() ?? '';
+  const color = typed ? parseHex(typed) : null;
+  return !typed || (color !== null && rgbToHex(color) === fixed.base);
+}
+
+/** How a rule reads: `step 03` or `88%`. */
+function ruleLabel(rule: SlotRule): string {
+  return rule.kind === 'step' ? `step ${stepLabel(rule.step)}` : `${Math.round(rule.amount * 100)}%`;
+}
+
+/**
+ * The rule that lands this slot on `step` for the current base. A step rule takes the step
+ * itself; a mix rule takes the share of white or black that lands there, in whole percent.
+ */
+function ruleAtStep(group: BrandGroup, part: string, step: number): SlotRule | null {
+  const rule = ruleFor(group, part);
+  const base = brandTheme?.slots.find((s) => s.group === group && s.part === 'base');
+  if (!rule || !base) return null;
+  const target = Math.min(100, Math.max(0, Math.round(step)));
+  if (rule.kind === 'step') return { kind: 'step', step: target };
+  const color = parseHex(base.hex) as Rgb;
+  const amount = part.startsWith('tint') ? whiteForStep(color, target) : blackForStep(color, target);
+  return { kind: 'mix', amount: Math.round(amount * 100) / 100 };
+}
+
+function setRule(group: BrandGroup, part: string, rule: SlotRule) {
+  if (!brand.recipe) return;
+  (brand.recipe[group] as Record<string, SlotRule>)[part] = rule;
+  regenerate();
+  placeMarkers();
+  renderThemeList();
+  syncBrandActions();
+  syncReset();
+  saveBrand();
+}
+
+/** Where the strips live: the recipe card, above the on-color and alpha bars. */
+let stripsHost: HTMLElement | null = null;
+/** Where the theme list lives: under the recipe card. */
+let themeHost: HTMLElement | null = null;
+
+/** Move and recolor the dots in place: rebuilding mid-drag would drop the pointer. */
+function placeMarkers() {
+  if (!brandTheme || !stripsHost) return;
+  for (const slot of brandTheme.slots) {
+    const marker = stripsHost.querySelector(`.marker[data-key="${slot.key}"]`) as HTMLElement | null;
+    if (!marker) continue;
+    marker.style.left = `${slot.step}%`;
+    marker.style.background = slot.hex;
+    const rule = ruleFor(slot.group, slot.part);
+    marker.title = `${slot.key}  ${slot.hex}  step ${stepLabel(slot.step)}` + (rule ? `  (${ruleLabel(rule)})` : '');
+  }
+}
+
+/** Drag a dot along its strip, or nudge it with the arrow keys, to edit its recipe rule. */
+function makeDraggable(marker: HTMLElement, bar: HTMLElement, name: HTMLElement, group: BrandGroup, part: string) {
+  const label = GROUP_LABELS[group];
+  const show = () => {
+    const rule = ruleFor(group, part);
+    name.textContent = rule ? `${PART_LABELS[part] ?? part} ${ruleLabel(rule)}` : label;
   };
+  const hide = () => (name.textContent = label);
+
+  marker.tabIndex = 0;
+  marker.classList.add('draggable');
+  marker.onmouseenter = show;
+  marker.onmouseleave = () => !marker.dataset.dragging && hide();
+  marker.onfocus = show;
+  marker.onblur = hide;
+
+  marker.addEventListener('pointerdown', (event: PointerEvent) => {
+    event.preventDefault();
+    marker.setPointerCapture?.(event.pointerId);
+    marker.dataset.dragging = 'true';
+    marker.focus();
+    const move = (e: PointerEvent) => {
+      const rect = bar.getBoundingClientRect();
+      if (!rect.width) return;
+      const rule = ruleAtStep(group, part, ((e.clientX - rect.left) / rect.width) * 100);
+      if (rule) setRule(group, part, rule);
+      show();
+    };
+    const up = () => {
+      delete marker.dataset.dragging;
+      marker.removeEventListener('pointermove', move);
+      marker.removeEventListener('pointerup', up);
+      marker.removeEventListener('pointercancel', up);
+    };
+    marker.addEventListener('pointermove', move);
+    marker.addEventListener('pointerup', up);
+    marker.addEventListener('pointercancel', up);
+  });
+
+  marker.addEventListener('keydown', (event: KeyboardEvent) => {
+    const delta = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+    const slot = brandTheme?.slots.find((s) => s.group === group && s.part === part);
+    if (!delta || !slot) return;
+    event.preventDefault();
+    const rule = ruleAtStep(group, part, slot.step + delta * (event.shiftKey ? 10 : 1));
+    if (rule) setRule(group, part, rule);
+    show();
+  });
+}
+
+/**
+ * One strip per group: the white -> base -> black path with a dot on every slot. The dots
+ * are the recipe: drag one (or use the arrow keys) to move that tint or shade, and the
+ * strip's label reads out its rule while you do.
+ */
+function renderBrandPreview() {
+  if (!stripsHost) return;
+  stripsHost.innerHTML = '';
+  // Nothing to show yet: the Recipe tab and the disabled actions say what is missing.
+  if (!brandTheme) return;
 
   const rows = el('div', { className: 'spectra' });
   for (const group of BRAND_GROUPS) {
     const base = brandTheme.slots.find((s) => s.group === group && s.part === 'base');
     if (!base) continue;
 
+    const name = el('span', { className: 'name', textContent: GROUP_LABELS[group] });
     const bar = el('div', { className: 'spectrum' });
     const path = spectrum(base.hex, 2).map((p) => `${p.hex} ${p.step.toFixed(2)}%`);
     bar.style.background = `linear-gradient(to right, ${path.join(', ')})`;
@@ -509,244 +706,275 @@ function renderBrandPreview() {
     for (const part of BRAND_LIGHT_TO_DARK[group]) {
       const slot = brandTheme.slots.find((s) => s.group === group && s.part === part);
       if (!slot) continue;
-      const marker = el('span', {
-        className: 'marker',
-        title: `${slot.key}  ${slot.hex}  step ${stepLabel(slot.step)}`,
-      });
+      const marker = el('span', { className: 'marker' });
       marker.dataset.key = slot.key;
-      marker.style.left = `${slot.step}%`;
-      marker.style.background = slot.hex;
-      marker.onmouseenter = () => {
-        meta.innerHTML = '';
-        meta.append(
-          el('span', { textContent: `${slot.key}  ${slot.hex}` }),
-          el('span', { textContent: `step ${stepLabel(slot.step)}` }),
-        );
-      };
+      if (ruleFor(group, part)) makeDraggable(marker, bar, name, group, part);
       bar.append(marker);
     }
-    bar.onmouseleave = summary;
 
-    rows.append(
-      el('div', { className: 'spectrum-row' }, [
-        el('span', { className: 'name', textContent: GROUP_LABELS[group] }),
-        bar,
-      ]),
-    );
+    rows.append(el('div', { className: 'spectrum-row' }, [name, bar]));
   }
-  summary();
-
-  previewEl.innerHTML = '';
-  previewEl.append(el('div', { className: 'card' }, [rows, meta]));
+  stripsHost.append(rows);
+  placeMarkers();
 }
 
+/** The Brand tool has no tabs: recipe and theme share one panel. */
 function renderBrandTabs() {
   tabsEl.innerHTML = '';
-  for (const tab of ['colors', 'recipe', 'theme'] as BrandTab[]) {
-    const button = el('button', { className: 'tab', textContent: BRAND_TAB_LABELS[tab] });
-    button.setAttribute('aria-selected', String(tab === brandTab));
-    button.onclick = () => {
-      brandTab = tab;
-      renderBrandTabs();
-      renderBrandPanel();
-    };
-    tabsEl.append(button);
-  }
 }
 
-/** A native color picker paired with a hex field; either one drives the other. */
-function colorField(value: string, onChange: (hex: string) => void): HTMLElement {
-  let current = rgbToHex(parseHex(value) ?? { r: 0, g: 0, b: 0 });
-  const picker = el('input', { type: 'color', value: current.toLowerCase() });
-  const text = el('input', { type: 'text', value: current, spellcheck: false });
+/* Colors -------------------------------------------------------------------- */
+
+/**
+ * A native color picker paired with a hex field; either one drives the other. Empty is a
+ * valid state: the field shows the placeholder and the swatch shows it faded.
+ */
+function colorField(value: string, placeholder: string, onChange: (hex: string) => void): HTMLElement {
+  // Shown without the "#", like Figma's own color fields; typed or pasted either way.
+  const bare = (hex: string) => hex.replace(/^#/, '');
+  const parsed = value.trim() ? parseHex(value) : null;
+  let current = parsed ? rgbToHex(parsed) : '';
+  const picker = el('input', { type: 'color', value: (current || placeholder).toLowerCase() });
+  const text = el('input', { type: 'text', value: bare(current), placeholder: bare(placeholder), spellcheck: false });
+  const field = el('div', { className: 'color-field' }, [picker, text]);
+  const mark = () => field.classList.toggle('empty', !current);
+  mark();
 
   picker.oninput = () => {
     current = picker.value.toUpperCase();
-    text.value = current;
+    text.value = bare(current);
+    mark();
     onChange(current);
   };
   // Commit on change, like the number fields: half-typed hex is not a color yet.
   text.onchange = () => {
+    if (!text.value.trim()) {
+      current = '';
+      picker.value = placeholder.toLowerCase();
+      mark();
+      onChange('');
+      return;
+    }
     const rgb = parseHex(text.value);
     if (!rgb) {
       setStatus(`"${text.value.trim()}" is not a hex color`, true);
-      text.value = current;
+      text.value = bare(current);
       return;
     }
     current = rgbToHex(rgb);
-    text.value = current;
+    text.value = bare(current);
     picker.value = current.toLowerCase();
+    mark();
     onChange(current);
   };
-  return el('div', { className: 'color-field' }, [picker, text]);
+  return field;
 }
 
-/** Tertiary and gradient: off by default (DDS behaviour), or a custom color. */
-function optionalColorRow(
-  label: string,
-  offLabel: string,
-  key: 'tertiary' | 'gradient',
-  fallback: () => string,
-): HTMLElement {
-  const value = brand.input[key]?.trim() ?? '';
-  const select = el('select');
-  select.append(
-    el('option', { value: 'off', textContent: offLabel }),
-    el('option', { value: 'custom', textContent: 'Custom' }),
-  );
-  select.value = value ? 'custom' : 'off';
-  select.onchange = () => {
-    brand.input[key] = select.value === 'custom' ? fallback() : '';
-    renderBrandPanel();
-    refreshBrand();
-  };
-
-  const controls: Node[] = [el('div', { className: 'select-wrap' }, [select])];
-  if (value) {
-    controls.push(
-      colorField(value, (hex) => {
-        brand.input[key] = hex;
-        refreshBrand();
-      }),
-    );
-  }
-  return row(label, ...controls);
-}
-
-function brandColorsCard(): HTMLElement {
-  const name = el('input', { type: 'text', value: brand.input.name });
+/**
+ * The brand's name and colors, pinned under the preview so they are always in reach. Only
+ * rebuilt on full renders: refreshes leave it alone, so typing and picker drags keep focus.
+ */
+function renderBrandForm() {
+  const name = el('input', { type: 'text', value: brand.input.name, placeholder: PLACEHOLDERS.name });
   name.oninput = () => {
     brand.input.name = name.value;
     refreshBrand();
   };
+  // Colors sit side by side, label on top of each field, with the name under them.
+  const color = (label: string, key: 'primary' | 'secondary' | 'tertiary', placeholder: string) =>
+    el('div', { className: 'color-cell' }, [
+      el('label', { textContent: label }),
+      colorField(brand.input[key] ?? '', placeholder, (hex) => {
+        brand.input[key] = hex;
+        refreshBrand();
+      }),
+    ]);
 
-  return el('div', { className: 'card' }, [
-    el('h2', { textContent: 'Brand' }),
+  formEl.innerHTML = '';
+  formEl.append(
+    el('div', { className: 'color-grid' }, [
+      color('Primary', 'primary', PLACEHOLDERS.primary),
+      color('Secondary', 'secondary', PLACEHOLDERS.secondary),
+      // Left empty, the tertiary is the recipe's fixed set (the DDS neutrals in the DDS recipe).
+      color('Tertiary', 'tertiary', brand.recipe?.tertiaryDefault?.base ?? PLACEHOLDERS.tertiary),
+    ]),
     row('Name', name),
-    row(
-      'Primary',
-      colorField(brand.input.primary, (hex) => {
-        brand.input.primary = hex;
-        refreshBrand();
-      }),
-    ),
-    row(
-      'Secondary',
-      colorField(brand.input.secondary, (hex) => {
-        brand.input.secondary = hex;
-        refreshBrand();
-      }),
-    ),
-    optionalColorRow('Tertiary', 'DDS neutrals', 'tertiary', () => '#333333'),
-    optionalColorRow('Gradient', 'Same as primary', 'gradient', () => brand.input.primary),
-  ]);
-}
-
-function brandVariablesCard(): HTMLElement {
-  const input = el('input', { type: 'text', value: brand.collectionName });
-  input.oninput = () => {
-    brand.collectionName = input.value;
-    saveBrand();
-  };
-  return el('div', { className: 'card' }, [
-    el('h2', { textContent: 'Variables' }),
-    row('Collection', input),
-    el('p', {
-      className: 'note',
-      textContent:
-        'One theme layer named as in the DDS (primary/primary-tint-1 and so on), in a mode ' +
-        'named after the brand. Another brand adds a mode; the same brand updates its own.',
-    }),
-  ]);
-}
-
-function ruleRow(label: string, rule: SlotRule, onChange: (rule: SlotRule) => void): HTMLElement {
-  if (rule.kind === 'step') {
-    return sliderRow(
-      label,
-      rule.step,
-      0,
-      100,
-      1,
-      (v) => onChange({ kind: 'step', step: v }),
-      (v) => `step ${stepLabel(Math.round(v))}`,
-    );
-  }
-  return sliderRow(
-    label,
-    Math.round(rule.amount * 100),
-    0,
-    100,
-    1,
-    (v) => onChange({ kind: 'mix', amount: v / 100 }),
-    (v) => `${Math.round(v)}%`,
   );
 }
 
-function recipeGroupCard(group: BrandGroup): HTMLElement {
-  const rules = brand.recipe[group] as Record<string, SlotRule>;
-  const title = group === 'tertiary' ? 'Tertiary (custom color only)' : GROUP_LABELS[group];
-  const card = el('div', { className: 'card' }, [el('h2', { textContent: title })]);
-  for (const part of Object.keys(rules)) {
-    card.append(
-      ruleRow(PART_LABELS[part] ?? part, rules[part], (rule) => {
-        rules[part] = rule;
-        refreshBrand();
-      }),
-    );
-  }
-  return card;
-}
+/* Recipe -------------------------------------------------------------------- */
 
-function recipeRulesCard(): HTMLElement {
-  const reset = el('button', { textContent: 'Reset to the DDS fit' });
-  reset.onclick = () => {
-    brand.recipe = clone(DDS_RECIPE);
-    renderBrandPanel();
-    refreshBrand();
+function recipeRulesCard(recipe: BrandRecipe): HTMLElement {
+  const exportButton = el('button', { textContent: 'Export' });
+  exportButton.onclick = () => {
+    const name = brand.input.name.trim() || brand.imported?.name || 'recipe';
+    const filename = `${brandSlug(name)}-recipe.json`;
+    downloadText(filename, recipeToJson(recipe, { name }));
+    setStatus(`Exported ${filename}`);
   };
+
+  // Section actions sit on the heading row, Figma style: reset (only after an edit),
+  // clear, import and export.
+  const actions: HTMLElement[] = [];
+  const imported = brand.imported;
+  if (imported) {
+    const reset = el('button', { textContent: 'Reset', title: `Back to ${imported.name}, as imported` });
+    reset.onclick = () => {
+      brand.recipe = clone(imported.recipe);
+      renderBrandPanel();
+      refreshBrand();
+    };
+    resetRow = reset;
+    actions.push(reset);
+    syncReset();
+  } else {
+    resetRow = null;
+  }
+  // Clear drops the recipe (and its saved copy) and returns the tool to its empty start.
+  const clear = el('button', { textContent: 'Clear', title: 'Remove the current recipe' });
+  clear.onclick = () => {
+    brand.recipe = null;
+    brand.imported = null;
+    render();
+    saveBrand();
+    setStatus('Removed the recipe');
+  };
+  actions.push(clear, importButton('Import'), exportButton);
+
+  const strips = el('div', { className: 'strips' });
+  stripsHost = strips;
+  renderBrandPreview();
+
+  // The two rules that are not slots, drawn like the strips so the column reads as one:
+  // same label width, bar height, dot and gap, with the value printed in the bar.
+  const onColor = stripSlider(
+    'On-color',
+    recipe.onContrast,
+    1,
+    Math.max(7, recipe.onContrast),
+    0.1,
+    (v) => `${v.toFixed(1)}:1`,
+    // A ratio, not a color: a plain neutral bar.
+    () => 'var(--color-bg-secondary)',
+    () => '#fff',
+    (v) => {
+      recipe.onContrast = v;
+      applyRecipeEdit();
+    },
+  );
+  const alphaMax = Math.max(50, Math.round(recipe.alpha * 100));
+  // Opacity, not any group's color: neutral black fading in over a checkerboard. It applies
+  // to every base-alpha-12 slot, primary and secondary alike.
+  const alpha = stripSlider(
+    'Alpha',
+    Math.round(recipe.alpha * 100),
+    0,
+    alphaMax,
+    1,
+    (v) => `${Math.round(v)}%`,
+    () =>
+      `linear-gradient(to right, ${withAlpha('#000000', 0)}, ${withAlpha('#000000', alphaMax / 100)}), ` +
+      'repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 8px 8px',
+    (v) => withAlpha('#000000', v / 100),
+    (v) => {
+      recipe.alpha = v / 100;
+      applyRecipeEdit();
+    },
+  );
+
   return el('div', { className: 'card' }, [
-    el('h2', { textContent: 'Recipe' }),
-    el('p', {
-      className: 'note',
-      textContent:
-        'A step mixes until the color lands on that DDS step; a percentage is the share of ' +
-        'white in a tint or of black in a shade. White text from the on-color contrast up. ' +
-        'The defaults are fitted to the 20 DDS brand themes.',
-    }),
-    sliderRow(
-      'On-color',
-      brand.recipe.onContrast,
-      1,
-      7,
-      0.1,
-      (v) => {
-        brand.recipe.onContrast = v;
-        refreshBrand();
-      },
-      (v) => `${v.toFixed(1)}:1`,
-    ),
-    sliderRow(
-      'Alpha',
-      Math.round(brand.recipe.alpha * 100),
-      1,
-      50,
-      1,
-      (v) => {
-        brand.recipe.alpha = v / 100;
-        refreshBrand();
-      },
-      (v) => `${Math.round(v)}%`,
-    ),
-    el('div', { className: 'linkrow' }, [reset]),
+    el('div', { className: 'card-head' }, [el('div', { className: 'head-actions' }, actions)]),
+    el('div', { className: 'recipe-rows' }, [strips, onColor, alpha]),
   ]);
 }
 
-function themeCard(): HTMLElement {
-  const card = el('div', { className: 'card' }, [el('h2', { textContent: `${brandTheme.name} theme` })]);
+function withAlpha(hex: string, alpha: number): string {
+  const c = parseHex(hex) ?? { r: 0, g: 0, b: 0 };
+  return `rgb(${Math.round(c.r * 255)} ${Math.round(c.g * 255)} ${Math.round(c.b * 255)} / ${alpha})`;
+}
+
+/**
+ * A range input dressed as a strip: the bar is `track()`, the thumb a dot filled with
+ * `dot(value)`, and the value is printed at the bar's right end.
+ */
+function stripSlider(
+  label: string,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  format: (v: number) => string,
+  track: () => string,
+  dot: (v: number) => string,
+  onInput: (v: number) => void,
+): HTMLElement {
+  const name = el('span', { className: 'name', textContent: label });
+  const readout = el('span', { className: 'strip-value' });
+  const input = el('input', {
+    type: 'range',
+    className: 'strip-range',
+    min: String(min),
+    max: String(max),
+    step: String(step),
+    value: String(value),
+  });
+  const paint = () => {
+    const v = Number(input.value);
+    input.style.setProperty('--track', track());
+    input.style.setProperty('--dot', dot(v));
+    input.title = `${label} ${format(v)}`;
+    readout.textContent = format(v);
+  };
+  input.oninput = () => {
+    onInput(Number(input.value));
+    paint();
+  };
+  paint();
+  return el('div', { className: 'spectrum-row' }, [name, el('div', { className: 'strip-field' }, [input, readout])]);
+}
+
+/** A recipe-wide rule changed: regenerate without rebuilding any control. */
+function applyRecipeEdit() {
+  regenerate();
+  placeMarkers();
+  renderThemeList();
+  syncBrandActions();
+  syncReset();
+  saveBrand();
+}
+
+/** The reset button, shown only while the recipe differs from the file it was imported from. */
+let resetRow: HTMLElement | null = null;
+
+function syncReset() {
+  if (!resetRow) return;
+  const edited = JSON.stringify(brand.recipe) !== JSON.stringify(brand.imported?.recipe);
+  resetRow.style.display = edited ? '' : 'none';
+}
+
+/* Theme --------------------------------------------------------------------- */
+
+/** Copy text through a throwaway textarea: the async clipboard API is blocked in Figma's iframe. */
+function copyText(text: string) {
+  const area = el('textarea', { value: text, className: 'clipboard', readOnly: true });
+  document.body.append(area);
+  area.select();
+  document.execCommand('copy');
+  area.remove();
+}
+
+function themeCard(theme: BrandTheme): HTMLElement {
+  const copy = el('button', { textContent: 'Copy JSON' });
+  copy.onclick = () => {
+    copyText(brandThemeToJson(theme));
+    setStatus('Copied the theme JSON');
+  };
+  const card = el('div', { className: 'card' }, [
+    el('div', { className: 'card-head' }, [el('div', { className: 'head-actions' }, [copy])]),
+  ]);
   for (const group of BRAND_GROUPS) {
     card.append(el('div', { className: 'token-group', textContent: GROUP_LABELS[group] }));
-    for (const slot of brandTheme.slots.filter((s) => s.group === group)) {
+    for (const slot of theme.slots.filter((s) => s.group === group)) {
       const chip = el('span', { className: 'chip' });
       const { r, g, b, a } = slot.rgb;
       chip.style.setProperty(
@@ -764,83 +992,81 @@ function themeCard(): HTMLElement {
       );
     }
   }
-  card.append(
-    el('div', { className: 'token-group', textContent: 'Root' }),
-    el('div', { className: 'token' }, [
-      el('span', { className: 'chip text', textContent: 'Aa' }),
-      el('span', { className: 'key', textContent: 'theme' }),
-      el('span', { className: 'hex', textContent: brandTheme.name }),
-    ]),
-  );
   return card;
 }
 
-function brandExportCard(): HTMLElement {
-  const textarea = el('textarea', { readOnly: true, id: 'brand-export' });
-  textarea.value = brandThemeToJson(brandTheme);
-  const copy = el('button', { textContent: 'Copy JSON' });
-  copy.onclick = () => {
-    textarea.select();
-    document.execCommand('copy');
-    setStatus('Copied the theme JSON');
-  };
-  return el('div', { className: 'card' }, [
-    el('h2', { textContent: 'Export' }),
-    textarea,
-    el('div', { className: 'linkrow' }, [copy]),
-  ]);
-}
-
+/** One panel: the recipe's controls, then the theme they produce. */
 function renderBrandPanel() {
   panelsEl.innerHTML = '';
-  if (brandTab === 'colors') {
-    panelsEl.append(brandColorsCard(), brandVariablesCard());
-  } else if (brandTab === 'recipe') {
+  stripsHost = null;
+  themeHost = null;
+  const recipe = brand.recipe;
+  if (!recipe) {
     panelsEl.append(
-      recipeRulesCard(),
-      recipeGroupCard('primary'),
-      recipeGroupCard('secondary'),
-      recipeGroupCard('tertiary'),
+      emptyState(
+        'No recipe yet. Import a recipe file to start; it is kept in the plugin on this ' +
+          'computer, so it is still here next time.',
+        [importButton()],
+      ),
     );
-  } else {
-    panelsEl.append(themeCard(), brandExportCard());
+    return;
   }
+  themeHost = el('div', { className: 'theme-host' });
+  panelsEl.append(recipeRulesCard(recipe), themeHost);
+  renderThemeList();
+}
+
+/** The theme list, or what is still missing before there is one. */
+function renderThemeList() {
+  if (!themeHost) return;
+  themeHost.innerHTML = '';
+  themeHost.append(brandTheme ? themeCard(brandTheme) : emptyState(brandError || brandNotice));
 }
 
 function renderBrandFooter() {
-  const collectionName = () => brand.collectionName.trim() || DEFAULT_COLLECTION;
-
   const variables = el('button', { className: 'primary', textContent: 'Create variables' });
-  variables.onclick = () => {
-    if (brandError) return setStatus(brandError, true);
-    send({ type: 'create-brand-variables', theme: brandTheme, collectionName: collectionName() });
-  };
+  variables.onclick = () => brandTheme && send({ type: 'create-brand-variables', theme: brandTheme });
 
   const doc = el('button', { textContent: 'Create documentation' });
-  doc.onclick = () => {
-    if (brandError) return setStatus(brandError, true);
-    send({ type: 'create-brand-doc', theme: brandTheme, collectionName: collectionName() });
-  };
+  doc.onclick = () => brandTheme && send({ type: 'create-brand-doc', theme: brandTheme });
 
+  brandActions.splice(0, brandActions.length, doc, variables);
+  syncBrandActions();
   footerEl.innerHTML = '';
-  footerEl.append(el('div', { className: 'actions' }, [doc, variables]), el('div', { id: 'status' }));
+  footerEl.append(el('div', { className: 'actions' }, [doc, variables]));
+}
+
+/** Nothing to create until there is a theme. */
+function syncBrandActions() {
+  for (const button of brandActions) button.disabled = !brandTheme;
 }
 
 function renderBrand() {
   regenerate();
-  renderBrandPreview();
+  // The Brand tool keeps its strips in the Recipe tab; the top preview is the Curves ramp's.
+  previewEl.innerHTML = '';
+  renderBrandForm();
   renderBrandTabs();
   renderBrandPanel();
   renderBrandFooter();
-  if (brandError) setStatus(brandError, true);
+  notifyBrandError();
+}
+
+/** Toast a theme error once when it appears, not again on every keystroke while it lasts. */
+let shownBrandError = '';
+function notifyBrandError() {
+  if (brandError && brandError !== shownBrandError) setStatus(brandError, true);
+  shownBrandError = brandError;
 }
 
 /** Cheap path for the Brand tool: recolor the preview and keep the controls in place. */
 function refreshBrand() {
   regenerate();
   renderBrandPreview();
-  if (brandTab === 'theme') renderBrandPanel();
-  setStatus(brandError, Boolean(brandError));
+  renderThemeList();
+  syncBrandActions();
+  syncReset();
+  notifyBrandError();
   saveBrand();
 }
 
@@ -855,6 +1081,7 @@ function render() {
     renderBrand();
     return;
   }
+  formEl.innerHTML = '';
   stops = generatePalette(config);
   renderPreview();
   renderTabs();
@@ -978,8 +1205,6 @@ window.onmessage = (event: MessageEvent) => {
     }
     if (changed) render();
   }
-  if (message.type === 'done') setStatus(message.message);
-  if (message.type === 'error') setStatus(message.message, true);
 };
 
 initResize();

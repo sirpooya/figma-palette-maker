@@ -25,6 +25,7 @@ pnpm test:all         # everything above
 bun test/golden.ts    # run one test file
 bun test/example.ts   # print sample ramps as ANSI blocks, eyeball check
 bun scripts/fit-recipe.ts    # refit the brand recipe from the DDS fixture, print the CV table
+bun scripts/fit-recipe.ts --write   # ...and rewrite recipes/dds.json, the DDS recipe
 bun scripts/dds-fixture.ts   # refresh test/fixtures/dds-themes.json from the DDS API (network)
 ```
 
@@ -48,7 +49,10 @@ Three layers, with a hard boundary between the two Figma runtimes:
   a primary, secondary and optional tertiary/gradient color into the 20 DDS theme slots.
   Tints and shades are mixes with white/black in gamma-encoded sRGB, and the DDS step number
   is `round(100 × (1 − Rec.601 luma))`, so "lighten to step n" solves the mix in closed form.
-  The constants live in `DDS_RECIPE`.
+  The engine is headless: `generateBrandTheme` always takes a recipe, and every number
+  and fixed color (`onDark`, `tertiaryDefault`) comes from it. `recipeToJson` /
+  `parseRecipe` are the file format the Recipe tab imports and exports; parsing is strict
+  and all-or-nothing. Tests and scripts read `recipes/dds.json` from disk.
 - **Sandbox (`plugin/code.ts` + `src/figma.ts`)**: the only code that touches the
   document and `figma.*`. Creates swatch frames, upserts variables by name into a
   collection (finds existing collection, mode and variables before creating), writes the
@@ -75,15 +79,31 @@ Rules that follow from the boundary:
   `primary/primary-tint-1` ... `primary/on-primary` (9), `secondary/...` (6),
   `tertiary/...` (5), plus the root `theme` string. The DDS Core Figma file is
   `LIxcZCIshqMTCD42AQm69S` if the structure ever needs re-checking.
-- The plugin writes one theme layer with raw color values and no Core primitives (the
-  user's call, 2026-10-11). Do not add a Core collection or aliases without asking.
-- Never hand-tune `DDS_RECIPE`. The constants are fitted by `scripts/fit-recipe.ts` from
+- The plugin writes one theme layer with raw color values and no Core primitives, in a
+  collection named after the brand, with no collection field in the UI (both the user's
+  call, 2026-10-11). Do not add a Core collection, aliases or a collection picker without
+  asking.
+- The Brand tool is headless (the user's call, 2026-10-11): the plugin bundles no recipe,
+  no default colors and no DDS values. It starts empty until a recipe is imported, which
+  then lives in clientStorage. `#ED1944` / `#1672DD` / `#333333` are placeholder hints
+  only, never values. Do not reintroduce a built-in default.
+- Never hand-tune `recipes/dds.json`. It is written by `scripts/fit-recipe.ts --write` from
   `test/fixtures/dds-themes.json`, and `test/brand.ts` fails when the two disagree. The fit
-  found no hue dependence (yellow included), so do not add hue special cases either.
+  found no hue dependence (yellow included), so do not add hue special cases either. A
+  brand that wants other numbers imports its own recipe file instead.
 - Step numbers use Rec. 601 luma on gamma-encoded channels. OKLab L or CIE L* give the
   wrong numbers.
-- The UI's tool switch (`#tool`, `.tool` buttons) sits above the per-tool tab strip
-  (`#tabs`, `.tab`); tests select tabs as `#tabs .tab`. Brand settings and the last tool
+- The UI's tool switch (`#tool`, `.tool` buttons) sits above the Curves tool's tab strip
+  (`#tabs`, `.tab`; tests select tabs as `#tabs .tab`). The Brand tool has no tabs: `#tabs`
+  is empty and hidden. Its fields live in their own pinned region (`#form`, above
+  `#preview`) that refreshes never rebuild, so typing and color picker drags keep focus; it
+  is emptied in the Curves tool. `#preview` stays empty in the Brand tool.
+- The Brand panel is the recipe card, then the theme list. The strips live in the recipe
+  card (`stripsHost`) and the list in `themeHost`; edits update both in place
+  (`renderBrandPreview`, `placeMarkers`, `renderThemeList`) and never rebuild the card, so
+  a dot or bar being dragged keeps the pointer. The dots are the recipe's only per-slot
+  controls (`setRule`). The smoke test drives dots with the arrow keys (happy-dom
+  has no layout); real drags were checked in headless Chrome. Brand settings and the last tool
   persist under the `palette-maker:brand` and `palette-maker:tool` clientStorage keys, and
   `restoreBrand` fills gaps in settings saved by older builds.
 
@@ -116,6 +136,7 @@ The engine must stay bit-identical to the original tool:
 - The OKLab matrices are culori's exact coefficients. Do not "clean up" the constants.
 - `test/brand.ts` checks the brand engine against the DDS itself (`test/fixtures/dds-themes.json`):
   step numbers against the DDS color names, the recipe against every brand's hand-picked
-  slots, on-colors against all 40 bases, and `DDS_RECIPE` against a fresh fit.
+  slots, on-colors against all 40 bases, `recipes/dds.json` against a fresh fit, and the
+  recipe file format (round trip and strict refusals).
 
 `manifest.json` declares no network access; keep it that way.

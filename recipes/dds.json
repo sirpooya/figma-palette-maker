@@ -1,0 +1,33 @@
+{
+  "format": "palette-maker-recipe",
+  "version": 1,
+  "name": "DDS fit",
+  "description": "Fitted to the 20 DDS brand themes (tokens commit 0d9585f) by scripts/fit-recipe.ts. step: mix until the color lands on that DDS step. white / black: share of white in a tint or black in a shade, in percent. onContrast: white text from this contrast ratio up, onDark below it. alpha: opacity of the base-alpha-12 slots, in percent. tertiaryDefault: the fixed tertiary used when no tertiary color is picked.",
+  "primary": {
+    "tint-1": { "step": 3 },
+    "tint-2": { "white": 88 },
+    "tint-3": { "step": 21 },
+    "shade-2": { "black": 20 },
+    "shade-1": { "black": 55 }
+  },
+  "secondary": {
+    "tint-1": { "step": 4 },
+    "tint-2": { "white": 68 },
+    "shade-1": { "black": 41 }
+  },
+  "tertiary": {
+    "tint-1": { "step": 7 },
+    "tint-2": { "step": 48 },
+    "shade-1": { "step": 96 }
+  },
+  "onContrast": 2,
+  "onDark": "#0A0A0A",
+  "alpha": 12,
+  "tertiaryDefault": {
+    "base": "#333333",
+    "tint-1": "#ECEDEF",
+    "tint-2": "#848484",
+    "shade-1": "#0A0A0A",
+    "on": "#FFFFFF"
+  }
+}
