@@ -39,7 +39,7 @@ function check(label: string, actual: unknown, expected: unknown) {
 const last = (type: string) => [...posted].reverse().find((m) => m.type === type);
 const $ = <T extends Element>(sel: string) => document.querySelector(sel) as T | null;
 const $$ = (sel: string) => Array.from(document.querySelectorAll(sel));
-const tabs = () => $$('.tab') as HTMLButtonElement[];
+const tabs = () => $$('#tabs .tab') as HTMLButtonElement[];
 const openTab = (label: string) => tabs().find((t) => t.textContent === label)?.click();
 const ranges = () => $$('input[type="range"]') as HTMLInputElement[];
 const click = (label: string) =>
@@ -47,7 +47,8 @@ const click = (label: string) =>
 const fire = (node: Element, type: string) =>
   node.dispatchEvent(new Event(type, { bubbles: true }));
 
-// The shell mounts four regions; only the middle one scrolls.
+// The shell mounts five regions; only the middle one scrolls.
+check('tool switch mounted', Boolean($('#tool .toolbar')), true);
 check('preview mounted', Boolean($('#preview .ramp')), true);
 check('tabs mounted', tabs().length, 4);
 check('footer mounted', Boolean($('#footer .actions')), true);
@@ -187,6 +188,101 @@ openTab('Lightness');
 const gridCols = getComputedStyle($('.params') as HTMLElement).gridTemplateColumns;
 check('params use an auto-fit grid', gridCols.includes('auto-fit'), true);
 check('params floor is overflow-safe', gridCols.includes('min(100%'), true);
+
+
+/* -------------------------------------------------------------------------- */
+/* Brand tool                                                                  */
+/* -------------------------------------------------------------------------- */
+
+const tools = () => $$('#tool .tool') as HTMLButtonElement[];
+const marker = (key: string) => $(`.marker[data-key="${key}"]`) as HTMLElement | null;
+const hexFields = () => $$('.color-field input[type="text"]') as HTMLInputElement[];
+const rowNamed = (label: string) =>
+  ($$('.row') as HTMLElement[]).find((r) => r.querySelector('label')?.textContent === label);
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+check('tools are Curves and Brand', tools().map((t) => t.textContent).join(','), 'Curves,Brand');
+check('curves is the default tool', tools()[0].getAttribute('aria-pressed'), 'true');
+
+tools()[1].click();
+check('brand tool pressed', tools()[1].getAttribute('aria-pressed'), 'true');
+check('brand tabs', tabs().map((t) => t.textContent).join(','), 'Colors,Recipe,Theme');
+check('one spectrum per group', $$('.spectrum').length, 3);
+check('primary has six slot markers', $$('.spectrum')[0].querySelectorAll('.marker').length, 6);
+check('base marker sits at its step', marker('primary-base')?.style.left, '63%');
+check('tint-1 marker at step 3', marker('primary-tint-1')?.style.left, '3%');
+
+// The hex field drives the theme.
+hexFields()[0].value = '#7f53ef';
+fire(hexFields()[0], 'change');
+check('hex is normalized', hexFields()[0].value, '#7F53EF');
+check('primary drives the spectrum', marker('primary-base')?.style.left, '55%');
+
+hexFields()[0].value = 'not a color';
+fire(hexFields()[0], 'change');
+check('bad hex is refused', hexFields()[0].value, '#7F53EF');
+check('bad hex is reported', document.getElementById('status')?.dataset.error, 'true');
+
+// Tertiary starts on the DDS neutrals; picking Custom adds a color field.
+const tertiarySelect = () => ($$('select') as HTMLSelectElement[])[0];
+check('tertiary defaults to neutrals', tertiarySelect().value, 'off');
+tertiarySelect().value = 'custom';
+fire(tertiarySelect(), 'change');
+check('custom tertiary adds a color field', hexFields().length, 3);
+
+// Recipe sliders move the slots live.
+openTab('Recipe');
+const tint1 = rowNamed('Tint 1')?.querySelector('input[type="range"]') as HTMLInputElement;
+check('recipe shows steps', rowNamed('Tint 1')?.querySelector('.value')?.textContent, 'step 03');
+tint1.value = '10';
+fire(tint1, 'input');
+check('tint-1 slider moves the marker', marker('primary-tint-1')?.style.left, '10%');
+check('mix rules read as percentages', rowNamed('Shade 1')?.querySelector('.value')?.textContent, '55%');
+click('Reset to the DDS fit');
+check('reset restores the fit', marker('primary-tint-1')?.style.left, '3%');
+
+// Theme tab lists every variable, and the export has the DDS shape.
+openTab('Theme');
+check('theme table has 21 rows', $$('.token').length, 21);
+const brandJson = JSON.parse(($('#brand-export') as HTMLTextAreaElement).value);
+check('export keyed by brand', Object.keys(brandJson).join(','), 'new-brand');
+check('export alpha slot', brandJson['new-brand'].primary['primary-base-alpha-12'].$value, 'rgba(127,83,239,0.12)');
+
+click('Create variables');
+const brandVars = last('create-brand-variables');
+check('create-brand-variables sent', brandVars?.type, 'create-brand-variables');
+check('theme carries 20 slots', (brandVars?.theme as { slots: unknown[] })?.slots?.length, 20);
+check('default collection', brandVars?.collectionName, '🌈 Theme');
+
+click('Create documentation');
+check('create-brand-doc sent', last('create-brand-doc')?.type, 'create-brand-doc');
+
+await wait(300);
+const saved = last('save-brand') as { brand: { input: { primary: string } }; tool: string } | undefined;
+check('brand settings saved', saved?.brand?.input?.primary, '#7F53EF');
+check('tool saved', saved?.tool, 'brand');
+
+// A restore from an older build without a recipe falls back to the fit.
+window.dispatchEvent(
+  new MessageEvent('message', {
+    data: {
+      pluginMessage: {
+        type: 'restore-config',
+        config: null,
+        tool: 'brand',
+        brand: { input: { name: 'Saved', primary: '#00a049', secondary: '#1672dd' }, collectionName: '' },
+      },
+    },
+  }),
+);
+openTab('Colors');
+check('restored brand name', ($('.row input[type="text"]') as HTMLInputElement).value, 'Saved');
+check('restored primary', hexFields()[0].value, '#00A049');
+
+// Back to curves: the curve tool is untouched.
+tools()[0].click();
+check('curves pressed again', tools()[0].getAttribute('aria-pressed'), 'true');
+check('ramp is back', $$('.ramp > div').length, 8);
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
 await GlobalRegistrator.unregister();

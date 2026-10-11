@@ -1,0 +1,834 @@
+{
+  "source": "https://assets.alamut.digikala.com/api/tokens",
+  "commit": "0d9585f17ad563ea7a5016f7ce212396e2271247",
+  "committed": "2026-10-10T11:39:27.000Z",
+  "colors": {
+    "neutral.12": "#e0e0e0",
+    "neutral.24": "#c1c1c1",
+    "neutral.36": "#a2a2a2",
+    "neutral.48": "#848484",
+    "neutral.64": "#5c5c5c",
+    "neutral.80": "#333333",
+    "neutral.88": "#1f1f1f",
+    "neutral.96": "#0a0a0a",
+    "neutral.white": "#ffffff",
+    "neutral.black": "#000000",
+    "neutral.02-cold": "#f7f8fa",
+    "neutral.04-cold": "#f2f3f5",
+    "neutral.06-cold": "#ecedef",
+    "neutral.12-cold": "#dedfe0",
+    "neutral.24-cold": "#bfc0c1",
+    "neutral.black-alpha-30": "rgba(0,0,0,0.3)",
+    "neutral.black-alpha-65": "rgba(0,0,0,0.65)",
+    "neutral.white-alpha-65": "rgba(255,255,255,0.65)",
+    "neutral.black-alpha-12": "rgba(0,0,0,0.12)",
+    "neutral.black-alpha-0": "rgba(0,0,0,0)",
+    "neutral.white-alpha-0": "rgba(255,255,255,0)",
+    "neutral.black-alpha-04": "rgba(0,0,0,0.04)",
+    "neutral.white-alpha-50": "rgba(255,255,255,0.5)",
+    "neutral.white-alpha-12": "rgba(255,255,255,0.12)",
+    "neutral.black-alpha-50": "rgba(0,0,0,0.5)",
+    "neutral.white-alpha-30": "rgba(255,255,255,0.3)",
+    "neutral.white-alpha-04": "rgba(255,255,255,0.04)",
+    "neutral.black-alpha-02": "rgba(0,0,0,0.02)",
+    "neutral.black-alpha-24": "rgba(0,0,0,0.24)",
+    "neutral.04": "#f5f5f5",
+    "neutral.02": "#fafafa",
+    "neutral.06": "#efefef",
+    "neutral.black-alpha-08": "rgba(0,0,0,0.08)",
+    "neutral.white-alpha-08": "rgba(255,255,255,0.08)",
+    "neutral.01": "#fdfdfd",
+    "neutral.black-alpha-16": "rgba(0,0,0,0.16)",
+    "neutral.04-cold-alpha-0": "rgba(242,243,245,0)",
+    "neutral.white-alpha-75": "rgba(255,255,255,0.75)",
+    "brand.shop.pomegranate-62": "#ed1944",
+    "brand.shop.pomegranate-53": "#e40138",
+    "brand.shop.pomegranate-64": "#b6012d",
+    "brand.shop.pomegranate-35": "#f1809b",
+    "brand.shop.pomegranate-04": "#fdf0f3",
+    "brand.shop.pomegranate-91": "#440011",
+    "brand.shop.royalblue-77": "#0d4485",
+    "brand.shop.royalblue-04": "#f1f8fd",
+    "brand.shop.royalblue-41": "#59a6e8",
+    "brand.shop.royalblue-62": "#1672dd",
+    "brand.shop.pomegranate-62-alpha-12": "rgba(237,25,68,0.12)",
+    "brand.shop.pomegranate-03": "#fef5f7",
+    "brand.shop.old-turquoise-100": "#e6f4f7",
+    "brand.shop.old-turquoise-300": "#9ee3f0",
+    "brand.shop.old-turquoise-500": "#19bfd3",
+    "brand.shop.old-turquoise-700": "#008eb2",
+    "brand.shop.old-red-100": "#ffe6eb",
+    "brand.shop.old-red-300": "#f37a8a",
+    "brand.shop.old-red-500": "#ef4056",
+    "brand.shop.old-red-700": "#b90025",
+    "brand.shop.old-red-500-alpha-12": "rgba(239,64,86,0.12)",
+    "brand.shop.royalblue-11": "#e7f3fc",
+    "brand.shop.royalblue-62-alpha-12": "rgba(22,114,221,0.12)",
+    "brand.shop.royalblue-62-alpha-06": "rgba(22,114,221,0.06)",
+    "brand.gold.teal-08": "#e5eceb",
+    "brand.gold.teal-80": "#01494b",
+    "brand.gold.gold-16": "#ffd08f",
+    "brand.gold.gold-44": "#c4882e",
+    "brand.gold.teal-68": "#027275",
+    "brand.gold.gold-06": "#ffecd2",
+    "brand.gold.teal-35": "#7fb5b6",
+    "brand.gold.silver-foo": "#7d93aa",
+    "brand.ai.violet-03": "#f6f6ff",
+    "brand.ai.violet-56": "#7f53ef",
+    "brand.ai.azure-54": "#2586ff",
+    "brand.ai.violet-79": "#6000d9",
+    "brand.ai.violet-06": "#ecedff",
+    "brand.ai.violet-88": "#270a6e",
+    "brand.ai.violet-21": "#cbc3e3",
+    "brand.plus.magenta-02": "#fff7fe",
+    "brand.plus.❌magenta-37": "#e79ce0",
+    "brand.plus.magenta-62": "#b12ba4",
+    "brand.plus.magenta-69": "#941b80",
+    "brand.plus.magenta-86": "#42103e",
+    "brand.plus.magenta-04": "#ffecfd",
+    "brand.plus.magenta-62-alpha-12": "rgba(177,43,164,0.12)",
+    "brand.plus.magenta-20": "#eeb7e9",
+    "brand.digipay.vividblue-07": "#e7ecfd",
+    "brand.digipay.vividblue-74": "#0040ff",
+    "brand.fidibo.beige-87": "#23211f",
+    "brand.fidibo.beige-04": "#f8f5f1",
+    "brand.fidibo.beige-07": "#f2ede6",
+    "brand.fidibo.beige-26": "#c9baa7",
+    "brand.fidibo.beige-62": "#695e4f",
+    "brand.fidibo.blurple-67": "#493edc",
+    "brand.fidibo.blurple-07": "#e2e0ff",
+    "brand.pindo.yellow-28": "#fbb600",
+    "brand.pindo.navyblue-77": "#28367f",
+    "brand.pindo.yellow-22": "#ffce00",
+    "brand.digify.deepvioletpurple-75❌": "#4c2e83",
+    "brand.digify.deepvioletpurple-79": "#491d8b",
+    "brand.digify.deepvioletpurple-70": "#6929c4",
+    "brand.digify.deepvioletpurple-11": "#e8daff",
+    "brand.digify.deepvioletpurple-02": "#f6f2ff",
+    "brand.digify.aquamarine-57": "#009d9a",
+    "brand.digify.aquamarine-25": "#58f2c4",
+    "brand.digify.aquamarine-05": "#defcf3",
+    "brand.club.pacificblue-50": "#0fabc6",
+    "brand.boomi.tiffanyblue-45": "#2bb5b2",
+    "brand.shipment-seller-old.pumpkin-52": "#d86b00",
+    "brand.shipment-seller-old.pumpkin-06": "#fbede3",
+    "brand.shipment-seller-old.pumpkin-03": "#fcf3eb",
+    "brand.shipment-seller-old.pumpkin-97": "#0d0702",
+    "brand.shipment-fast.mediumblue-47": "#1028ff",
+    "brand.shipment-fast.mediumblue-04": "#f3f4ff",
+    "brand.shipment-fast.mediumblue-22": "#c4c9ff",
+    "brand.fresh.freshgreen-53": "#05ba58",
+    "brand.fresh.freshgreen-61": "#029a49",
+    "brand.fresh.freshgreen-10": "#cff2df",
+    "brand.jet.orange-47": "#ff5e1f",
+    "brand.jet.orange-63": "#b24500",
+    "brand.jet.orange-35": "#ff9600",
+    "brand.jet.orange-05": "#ffeee9",
+    "brand.jet.orange-02": "#fff7f4",
+    "brand.mehr.emerald-03": "#f2fbf9",
+    "brand.mehr.emerald-60": "#059675",
+    "brand.mehr.emerald-69": "#05745b",
+    "brand.mehr.emerald-25": "#93d3c4",
+    "brand.mehr.emerald-60-alpha12": "rgba(5,150,117,0.12)",
+    "brand.seller.persianblue-66": "#384ed8",
+    "brand.seller.persianblue-07": "#ebedfb",
+    "brand.seller.persianblue-27": "#afb8ef",
+    "brand.seller.persianblue-84": "#1a2463",
+    "brand.service.pinegreen-06": "#e6f4f7",
+    "brand.service.pinegreen-67": "#246b64",
+    "brand.service.pinegreen-78": "#1a4342",
+    "brand.magnet.deepcerise-05": "#fdecf5",
+    "brand.magnet.deepcerise-56": "#df328a",
+    "brand.magnet.darklavender-61": "#7d4c9e",
+    "brand.ganje.cobaltblue-69": "#005be2",
+    "brand.ganje.eggblue-43": "#2bbfb5",
+    "brand.pharmacy.softcyan-06": "#e5f2f7",
+    "brand.pharmacy.softcyan-13": "#cce6eb",
+    "brand.pharmacy.softcyan-32": "#80c0cc",
+    "brand.pharmacy.softcyan-84": "#00364d",
+    "brand.pharmacy.softcyan-64": "#008299",
+    "brand.pharmacy.softcyan-77": "#004f66",
+    "brand.supercoin.golden-03": "#fff7ec",
+    "brand.supercoin.golden-04": "#fff3da",
+    "brand.supercoin.golden-13": "#ffda9a",
+    "brand.supercoin.golden-15": "#ffd68f",
+    "brand.supercoin.golden-27": "#f4ab64",
+    "brand.supercoin.golden-42": "#c38950",
+    "brand.supercoin.golden-60": "#9a6b3e",
+    "brand.supercoin.golden-27-a12": "rgba(244,171,100,0.12)",
+    "brand.service-hub.sh-blue-04": "#f5f2fe",
+    "brand.service-hub.sh-blue-08": "#ece5fc",
+    "brand.service-hub.sh-blue-21": "#cfbff8",
+    "brand.service-hub.sh-blue-66": "#6633e9",
+    "brand.service-hub.sh-blue-74": "#531ae6",
+    "brand.service-hub.sh-blue-88": "#2d009f",
+    "brand.service-hub.sh-blue-66-alpha-12": "rgba(102,51,233,0.12)",
+    "brand.fashion.sec50": "#fdecec",
+    "brand.fashion.sec100": "#f8bfbf",
+    "brand.fashion.sec300": "#e38d82",
+    "brand.fashion.sec500": "#940000",
+    "brand.fashion.sec700": "#800000",
+    "brand.fashion.sec900": "#350000",
+    "brand.fashion.n100": "#cfcfcf",
+    "brand.fashion.n300": "#6f6f6f",
+    "brand.fashion.n500": "#3e3e3e",
+    "brand.fashion.n700": "#0e0e0e",
+    "brand.fashion.n900": "#0a0a0a",
+    "brand.fashion.n200": "#9f9f9f",
+    "brand.shipment-seller.amber-05": "rgba(255,200,0,0.1)",
+    "brand.shipment-seller.amber-14": "#ffefb3",
+    "brand.shipment-seller.amber-37": "#ffc800",
+    "brand.shipment-seller.amber-62": "#cca000",
+    "brand.shipment-seller.amber-84": "#8a6c00",
+    "brand.shipment-seller.amber-92": "#644e00",
+    "hint.error.crimson-28": "#e8a3a3",
+    "hint.error.crimson-78": "#b2001b",
+    "hint.error.crimson-56-alpha-12": "rgba(235,56,80,0.12)",
+    "hint.error.crimson-56-alpha-24": "rgba(235,56,80,0.24)",
+    "hint.error.crimson-56": "#eb3850",
+    "hint.error.crimson-87": "#6a0010",
+    "hint.error.crimson-56-alpha-06": "rgba(235,56,80,0.06)",
+    "hint.warning.sunglow-15": "#ffd38b",
+    "hint.warning.sunglow-66": "#984700",
+    "hint.warning.sunglow-30-alpha-12": "rgba(255,178,0,0.12)",
+    "hint.warning.sunglow-30-alpha-24": "rgba(255,178,0,0.24)",
+    "hint.warning.sunglow-30": "#ffb200",
+    "hint.warning.sunglow-77": "#642f00",
+    "hint.warning.darkorange-41-alpha-12": "rgba(245,127,23,0.12)",
+    "hint.warning.darkorange-41-alpha-24": "rgba(245,127,23,0.24)",
+    "hint.warning.darkorange-15": "#f9b274",
+    "hint.warning.darkorange-41": "#f57f17",
+    "hint.warning.darkorange-65": "#934c0e",
+    "hint.warning.darkorange-82": "#3b1e06",
+    "hint.success.mediumseagreen-26": "#a1cfa3",
+    "hint.success.mediumseagreen-64": "#2e7b32",
+    "hint.success.mediumseagreen-50-alpha-12": "rgba(61,170,88,0.12)",
+    "hint.success.mediumseagreen-50-alpha-24": "rgba(61,170,88,0.24)",
+    "hint.success.mediumseagreen-50": "#3daa58",
+    "hint.success.mediumseagreen-73": "#19631d",
+    "hint.success.mediumseagreen-06": "#e8f5eb",
+    "hint.info.cornflowerblue-44": "#82c8f9",
+    "hint.info.cornflowerblue-60": "#1778bd",
+    "hint.info.cornflowerblue-51-alpha-12": "rgba(38,151,231,0.12)",
+    "hint.info.cornflowerblue-51-alpha-24": "rgba(38,151,231,0.24)",
+    "hint.info.cornflowerblue-51": "#2697e7",
+    "hint.info.cornflowerblue-51-alpha-06": "rgba(38,151,231,0.06)",
+    "hint.info.cornflowerblue-75": "#045085",
+    "hint.info.purpleblue-58-alpha-06": "rgba(63,105,242,0.06)",
+    "hint.info.purpleblue-58-alpha-12": "rgba(63,105,242,0.12)",
+    "hint.info.purpleblue-58-alpha-24": "rgba(63,105,242,0.24)",
+    "hint.info.purpleblue-45": "#6b8bf5",
+    "hint.info.purpleblue-58": "#3f69f2",
+    "hint.info.purpleblue-69": "#2747e7",
+    "hint.info.purpleblue-78": "#212dac",
+    "hint.rating.1": "#f9a825",
+    "hint.rating.2": "#f9bc00",
+    "hint.rating.3": "#b1b64d",
+    "hint.rating.4": "#65aa57",
+    "hint.rating.5": "#00a049",
+    "semantic.yellow": "#ffcc00",
+    "semantic.amber": "#feb900",
+    "semantic.darkorchid": "#922fd3",
+    "semantic.steelblue": "#0081b9",
+    "semantic.neonpink": "#ff009c",
+    "semantic.mediumseagreen": "#00b088"
+  },
+  "themes": {
+    "shop": {
+      "secondary": {
+        "secondary-shade-1": "brand.shop.royalblue-77",
+        "secondary-tint-1": "brand.shop.royalblue-62-alpha-06",
+        "secondary-base": "brand.shop.royalblue-62",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.shop.royalblue-41",
+        "secondary-base-alpha-12": "brand.shop.royalblue-62-alpha-12"
+      },
+      "primary": {
+        "primary-tint-1": "brand.shop.pomegranate-03",
+        "primary-base": "brand.shop.pomegranate-62",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.shop.pomegranate-91",
+        "primary-tint-3": "brand.shop.pomegranate-35",
+        "primary-shade-2": "brand.shop.pomegranate-64",
+        "primary-gradient": "brand.shop.pomegranate-53",
+        "primary-tint-2": "brand.shop.pomegranate-04",
+        "primary-base-alpha-12": "brand.shop.pomegranate-62-alpha-12"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.04-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "commercial": {
+      "secondary": {
+        "secondary-shade-1": "brand.seller.persianblue-84",
+        "secondary-tint-1": "brand.seller.persianblue-07",
+        "secondary-base": "brand.seller.persianblue-66",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.seller.persianblue-27",
+        "secondary-base-alpha-12": "brand.seller.persianblue-07"
+      },
+      "primary": {
+        "primary-tint-1": "brand.seller.persianblue-07",
+        "primary-base": "brand.seller.persianblue-66",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.seller.persianblue-84",
+        "primary-tint-3": "brand.seller.persianblue-27",
+        "primary-shade-2": "brand.seller.persianblue-66",
+        "primary-gradient": "brand.seller.persianblue-66",
+        "primary-tint-2": "brand.seller.persianblue-07",
+        "primary-base-alpha-12": "brand.seller.persianblue-07"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.04-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "plus": {
+      "secondary": {
+        "secondary-shade-1": "brand.plus.magenta-86",
+        "secondary-tint-1": "brand.plus.magenta-02",
+        "secondary-base": "brand.plus.magenta-62",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.plus.magenta-20",
+        "secondary-base-alpha-12": "brand.plus.magenta-02"
+      },
+      "primary": {
+        "primary-tint-1": "brand.plus.magenta-02",
+        "primary-base": "brand.plus.magenta-62",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.plus.magenta-86",
+        "primary-tint-3": "brand.plus.magenta-20",
+        "primary-shade-2": "brand.plus.magenta-69",
+        "primary-gradient": "brand.plus.magenta-62",
+        "primary-tint-2": "brand.plus.magenta-04",
+        "primary-base-alpha-12": "brand.plus.magenta-62-alpha-12"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.04-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "ai": {
+      "secondary": {
+        "secondary-shade-1": "brand.ai.violet-88",
+        "secondary-tint-1": "brand.ai.violet-03",
+        "secondary-base": "brand.ai.violet-56",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.ai.violet-06",
+        "secondary-base-alpha-12": "brand.ai.violet-03"
+      },
+      "primary": {
+        "primary-tint-1": "brand.ai.violet-03",
+        "primary-base": "brand.ai.violet-56",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.ai.violet-88",
+        "primary-tint-3": "brand.ai.violet-21",
+        "primary-shade-2": "brand.ai.violet-79",
+        "primary-gradient": "brand.ai.azure-54",
+        "primary-tint-2": "brand.ai.violet-06",
+        "primary-base-alpha-12": "brand.ai.violet-03"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "gold": {
+      "secondary": {
+        "secondary-shade-1": "brand.gold.gold-44",
+        "secondary-tint-1": "brand.gold.gold-06",
+        "secondary-base": "brand.gold.gold-44",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.gold.gold-16",
+        "secondary-base-alpha-12": "brand.gold.gold-06"
+      },
+      "primary": {
+        "primary-tint-1": "brand.gold.teal-08",
+        "primary-base": "brand.gold.teal-68",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.gold.teal-80",
+        "primary-tint-3": "brand.gold.teal-35",
+        "primary-shade-2": "brand.gold.teal-80",
+        "primary-gradient": "brand.gold.teal-68",
+        "primary-tint-2": "brand.gold.teal-08",
+        "primary-base-alpha-12": "brand.gold.teal-08"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "mehr": {
+      "secondary": {
+        "secondary-shade-1": "brand.mehr.emerald-69",
+        "secondary-tint-1": "brand.mehr.emerald-03",
+        "secondary-base": "brand.mehr.emerald-60",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.mehr.emerald-60",
+        "secondary-base-alpha-12": "brand.mehr.emerald-03"
+      },
+      "primary": {
+        "primary-tint-1": "brand.mehr.emerald-03",
+        "primary-base": "brand.mehr.emerald-60",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.mehr.emerald-69",
+        "primary-tint-3": "brand.mehr.emerald-25",
+        "primary-shade-2": "brand.mehr.emerald-69",
+        "primary-gradient": "brand.mehr.emerald-60",
+        "primary-tint-2": "brand.mehr.emerald-03",
+        "primary-base-alpha-12": "brand.mehr.emerald-60-alpha12"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "super-coin": {
+      "secondary": {
+        "secondary-shade-1": "brand.supercoin.golden-42",
+        "secondary-tint-1": "brand.supercoin.golden-04",
+        "secondary-base": "brand.supercoin.golden-27",
+        "on-secondary": "neutral.96",
+        "secondary-tint-2": "brand.supercoin.golden-13",
+        "secondary-base-alpha-12": "brand.supercoin.golden-03"
+      },
+      "primary": {
+        "primary-tint-1": "brand.supercoin.golden-03",
+        "primary-base": "brand.supercoin.golden-27",
+        "on-primary": "neutral.96",
+        "primary-shade-1": "brand.supercoin.golden-60",
+        "primary-tint-3": "brand.supercoin.golden-13",
+        "primary-shade-2": "brand.supercoin.golden-42",
+        "primary-gradient": "brand.supercoin.golden-15",
+        "primary-tint-2": "brand.supercoin.golden-04",
+        "primary-base-alpha-12": "brand.supercoin.golden-27-a12"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "fashion": {
+      "secondary": {
+        "secondary-shade-1": "brand.fashion.sec700",
+        "secondary-tint-1": "brand.fashion.sec50",
+        "secondary-base": "brand.fashion.sec500",
+        "on-secondary": "neutral.white",
+        "secondary-tint-2": "brand.fashion.sec100",
+        "secondary-base-alpha-12": "brand.fashion.sec50"
+      },
+      "primary": {
+        "primary-tint-1": "brand.fashion.n100",
+        "primary-base": "brand.fashion.n700",
+        "on-primary": "neutral.white",
+        "primary-shade-1": "brand.fashion.n900",
+        "primary-tint-3": "brand.fashion.n200",
+        "primary-shade-2": "brand.fashion.n900",
+        "primary-gradient": "brand.fashion.n700",
+        "primary-tint-2": "brand.fashion.n200",
+        "primary-base-alpha-12": "brand.fashion.n100"
+      },
+      "tertiary": {
+        "tertiary-base": "neutral.96",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white",
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48"
+      }
+    },
+    "fresh": {
+      "primary": {
+        "primary-tint-1": "brand.fresh.freshgreen-10",
+        "primary-tint-2": "brand.fresh.freshgreen-10",
+        "primary-tint-3": "brand.fresh.freshgreen-10",
+        "primary-gradient": "brand.fresh.freshgreen-53",
+        "primary-base": "brand.fresh.freshgreen-61",
+        "primary-shade-2": "brand.fresh.freshgreen-61",
+        "primary-shade-1": "brand.fresh.freshgreen-61",
+        "primary-base-alpha-12": "brand.fresh.freshgreen-10",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.fresh.freshgreen-10",
+        "secondary-tint-2": "brand.fresh.freshgreen-53",
+        "secondary-base": "brand.fresh.freshgreen-61",
+        "secondary-shade-1": "brand.fresh.freshgreen-61",
+        "secondary-base-alpha-12": "brand.fresh.freshgreen-10",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Fresh"
+      }
+    },
+    "jet": {
+      "primary": {
+        "primary-tint-1": "brand.jet.orange-02",
+        "primary-tint-2": "brand.jet.orange-05",
+        "primary-tint-3": "brand.jet.orange-05",
+        "primary-gradient": "brand.jet.orange-47",
+        "primary-base": "brand.jet.orange-47",
+        "primary-shade-2": "brand.jet.orange-63",
+        "primary-shade-1": "brand.jet.orange-63",
+        "primary-base-alpha-12": "brand.jet.orange-02",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.jet.orange-02",
+        "secondary-tint-2": "brand.jet.orange-05",
+        "secondary-base": "brand.jet.orange-35",
+        "secondary-shade-1": "brand.jet.orange-63",
+        "secondary-base-alpha-12": "brand.jet.orange-02",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Jet"
+      }
+    },
+    "pharmacy": {
+      "primary": {
+        "primary-tint-1": "brand.pharmacy.softcyan-06",
+        "primary-tint-2": "brand.pharmacy.softcyan-13",
+        "primary-tint-3": "brand.pharmacy.softcyan-32",
+        "primary-gradient": "brand.pharmacy.softcyan-64",
+        "primary-base": "brand.pharmacy.softcyan-64",
+        "primary-shade-2": "brand.pharmacy.softcyan-77",
+        "primary-shade-1": "brand.pharmacy.softcyan-84",
+        "primary-base-alpha-12": "brand.pharmacy.softcyan-06",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.pharmacy.softcyan-13",
+        "secondary-tint-2": "brand.pharmacy.softcyan-32",
+        "secondary-base": "brand.pharmacy.softcyan-84",
+        "secondary-shade-1": "brand.pharmacy.softcyan-77",
+        "secondary-base-alpha-12": "brand.pharmacy.softcyan-13",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Pharmacy"
+      }
+    },
+    "digipay": {
+      "primary": {
+        "primary-tint-1": "brand.digipay.vividblue-07",
+        "primary-tint-2": "brand.digipay.vividblue-07",
+        "primary-tint-3": "brand.digipay.vividblue-07",
+        "primary-gradient": "brand.digipay.vividblue-74",
+        "primary-base": "brand.digipay.vividblue-74",
+        "primary-shade-2": "brand.digipay.vividblue-74",
+        "primary-shade-1": "brand.digipay.vividblue-74",
+        "primary-base-alpha-12": "brand.digipay.vividblue-07",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.digipay.vividblue-07",
+        "secondary-tint-2": "brand.digipay.vividblue-07",
+        "secondary-base": "brand.digipay.vividblue-74",
+        "secondary-shade-1": "brand.digipay.vividblue-74",
+        "secondary-base-alpha-12": "brand.digipay.vividblue-07",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Digipay"
+      }
+    },
+    "fidibo": {
+      "primary": {
+        "primary-tint-1": "brand.fidibo.beige-04",
+        "primary-tint-2": "brand.fidibo.beige-07",
+        "primary-tint-3": "brand.fidibo.beige-26",
+        "primary-gradient": "brand.fidibo.beige-62",
+        "primary-base": "brand.fidibo.beige-87",
+        "primary-shade-2": "brand.fidibo.beige-87",
+        "primary-shade-1": "brand.fidibo.beige-87",
+        "primary-base-alpha-12": "brand.fidibo.beige-04",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.fidibo.blurple-07",
+        "secondary-tint-2": "brand.fidibo.blurple-07",
+        "secondary-base": "brand.fidibo.blurple-67",
+        "secondary-shade-1": "brand.fidibo.blurple-67",
+        "secondary-base-alpha-12": "brand.fidibo.blurple-07",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Fidibo"
+      }
+    },
+    "digify": {
+      "primary": {
+        "primary-tint-1": "brand.digify.deepvioletpurple-02",
+        "primary-tint-2": "brand.digify.deepvioletpurple-02",
+        "primary-tint-3": "brand.digify.deepvioletpurple-11",
+        "primary-gradient": "brand.digify.deepvioletpurple-70",
+        "primary-base": "brand.digify.deepvioletpurple-70",
+        "primary-shade-2": "brand.digify.deepvioletpurple-79",
+        "primary-shade-1": "brand.digify.deepvioletpurple-79",
+        "primary-base-alpha-12": "brand.digify.deepvioletpurple-02",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.digify.aquamarine-05",
+        "secondary-tint-2": "brand.digify.aquamarine-25",
+        "secondary-base": "brand.digify.aquamarine-57",
+        "secondary-shade-1": "brand.digify.aquamarine-57",
+        "secondary-base-alpha-12": "brand.digify.aquamarine-05",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Digify"
+      }
+    },
+    "car": {
+      "primary": {
+        "primary-tint-1": "neutral.02-cold",
+        "primary-tint-2": "neutral.12-cold",
+        "primary-tint-3": "neutral.24-cold",
+        "primary-gradient": "neutral.88",
+        "primary-base": "neutral.88",
+        "primary-shade-2": "neutral.88",
+        "primary-shade-1": "neutral.96",
+        "primary-base-alpha-12": "neutral.02-cold",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "neutral.02-cold",
+        "secondary-tint-2": "neutral.24-cold",
+        "secondary-base": "neutral.64",
+        "secondary-shade-1": "neutral.96",
+        "secondary-base-alpha-12": "neutral.02-cold",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Car"
+      }
+    },
+    "service-hub": {
+      "primary": {
+        "primary-tint-1": "brand.service-hub.sh-blue-04",
+        "primary-tint-2": "brand.service-hub.sh-blue-08",
+        "primary-tint-3": "brand.service-hub.sh-blue-21",
+        "primary-gradient": "brand.service-hub.sh-blue-66",
+        "primary-base": "brand.service-hub.sh-blue-66",
+        "primary-shade-2": "brand.service-hub.sh-blue-74",
+        "primary-shade-1": "brand.service-hub.sh-blue-88",
+        "primary-base-alpha-12": "brand.service-hub.sh-blue-66-alpha-12",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "brand.service-hub.sh-blue-04",
+        "secondary-tint-2": "brand.service-hub.sh-blue-21",
+        "secondary-base": "brand.service-hub.sh-blue-66",
+        "secondary-shade-1": "brand.service-hub.sh-blue-88",
+        "secondary-base-alpha-12": "brand.service-hub.sh-blue-04",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Service Hub"
+      }
+    },
+    "void": {
+      "primary": {
+        "primary-tint-1": "neutral.02-cold",
+        "primary-tint-2": "neutral.12-cold",
+        "primary-tint-3": "neutral.24-cold",
+        "primary-gradient": "neutral.48",
+        "primary-base": "neutral.80",
+        "primary-shade-2": "neutral.88",
+        "primary-shade-1": "neutral.96",
+        "primary-base-alpha-12": "neutral.02-cold",
+        "on-primary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-1": "neutral.02-cold",
+        "secondary-tint-2": "neutral.24-cold",
+        "secondary-base": "neutral.64",
+        "secondary-shade-1": "neutral.96",
+        "secondary-base-alpha-12": "neutral.02-cold",
+        "on-secondary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-tint-1": "neutral.06-cold",
+        "tertiary-base": "neutral.80",
+        "tertiary-shade-1": "neutral.96",
+        "on-tertiary": "neutral.white",
+        "tertiary-tint-2": "neutral.48"
+      },
+      "root": {
+        "theme": "Void"
+      }
+    },
+    "seller-old": {
+      "primary": {
+        "primary-base-alpha-12": "brand.shipment-seller-old.pumpkin-06",
+        "primary-shade-1": "brand.shipment-seller-old.pumpkin-97",
+        "primary-gradient": "brand.shipment-seller-old.pumpkin-52",
+        "primary-tint-2": "brand.shipment-seller-old.pumpkin-06",
+        "primary-base": "brand.shipment-seller-old.pumpkin-52",
+        "primary-tint-1": "brand.shipment-seller-old.pumpkin-03",
+        "primary-tint-3": "brand.shipment-seller-old.pumpkin-06",
+        "primary-shade-2": "brand.shipment-seller-old.pumpkin-97",
+        "on-primary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48",
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-2": "brand.shipment-seller-old.pumpkin-06",
+        "on-secondary": "neutral.white",
+        "secondary-base-alpha-12": "brand.shipment-seller-old.pumpkin-06",
+        "secondary-base": "brand.shipment-seller-old.pumpkin-52",
+        "secondary-shade-1": "brand.shipment-seller-old.pumpkin-97",
+        "secondary-tint-1": "brand.shipment-seller-old.pumpkin-03"
+      },
+      "root": {
+        "theme": "Seller Old"
+      }
+    },
+    "seller": {
+      "primary": {
+        "primary-base-alpha-12": "brand.shipment-seller.amber-05",
+        "primary-shade-1": "brand.shipment-seller.amber-92",
+        "primary-gradient": "brand.shipment-seller.amber-37",
+        "primary-tint-2": "brand.shipment-seller.amber-05",
+        "primary-base": "brand.shipment-seller.amber-84",
+        "primary-tint-1": "brand.shipment-seller.amber-05",
+        "primary-tint-3": "brand.shipment-seller.amber-14",
+        "primary-shade-2": "brand.shipment-seller.amber-92",
+        "on-primary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-shade-1": "neutral.96",
+        "tertiary-tint-2": "neutral.48",
+        "tertiary-base": "neutral.80",
+        "tertiary-tint-1": "neutral.06-cold",
+        "on-tertiary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-2": "brand.shipment-seller.amber-05",
+        "on-secondary": "neutral.white",
+        "secondary-base-alpha-12": "brand.shipment-seller.amber-05",
+        "secondary-base": "brand.shipment-seller.amber-62",
+        "secondary-shade-1": "brand.shipment-seller.amber-92",
+        "secondary-tint-1": "brand.shipment-seller.amber-05"
+      },
+      "root": {
+        "theme": "Seller"
+      }
+    },
+    "fast": {
+      "primary": {
+        "primary-base-alpha-12": "brand.shipment-fast.mediumblue-04",
+        "primary-shade-1": "brand.shipment-fast.mediumblue-47",
+        "primary-gradient": "brand.shipment-fast.mediumblue-47",
+        "primary-tint-2": "brand.shipment-fast.mediumblue-04",
+        "primary-base": "brand.shipment-fast.mediumblue-47",
+        "primary-tint-1": "brand.shipment-fast.mediumblue-04",
+        "primary-tint-3": "brand.shipment-fast.mediumblue-22",
+        "primary-shade-2": "brand.shipment-fast.mediumblue-47",
+        "on-primary": "neutral.white"
+      },
+      "tertiary": {
+        "tertiary-shade-1": "brand.shipment-fast.mediumblue-47",
+        "tertiary-tint-2": "brand.shipment-fast.mediumblue-04",
+        "tertiary-base": "brand.shipment-fast.mediumblue-47",
+        "tertiary-tint-1": "brand.shipment-fast.mediumblue-04",
+        "on-tertiary": "neutral.white"
+      },
+      "secondary": {
+        "secondary-tint-2": "brand.shipment-fast.mediumblue-22",
+        "on-secondary": "neutral.white",
+        "secondary-base-alpha-12": "brand.shipment-fast.mediumblue-04",
+        "secondary-base": "brand.shipment-fast.mediumblue-47",
+        "secondary-shade-1": "brand.shipment-fast.mediumblue-47",
+        "secondary-tint-1": "brand.shipment-fast.mediumblue-04"
+      },
+      "root": {
+        "theme": "Fast"
+      }
+    }
+  }
+}

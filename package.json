@@ -9,9 +9,10 @@
     "build": "bun scripts/build.ts",
     "dev": "bun scripts/build.ts --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sandbox.json",
-    "test": "bun test/golden.ts && bun test/differential.ts && bun test/sweep.ts",
+    "test": "bun test/golden.ts && bun test/differential.ts && bun test/sweep.ts && bun test/brand.ts",
     "test:ui": "pnpm build && bun test/ui-smoke.ts",
-    "test:all": "pnpm typecheck && pnpm test && pnpm test:ui"
+    "test:all": "pnpm typecheck && pnpm test && pnpm test:ui",
+    "fit": "bun scripts/fit-recipe.ts"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.2",

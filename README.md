@@ -7,6 +7,14 @@ module you can drop into a Figma plugin.
 Verified against the original: the default 16 stop ramp matches the live site's output
 exactly, and every curve function is diff-tested against the original minified code.
 
+The plugin has two tools:
+
+- **Curves**: the palette maker port. Three OKLCH curves produce a ramp of any length.
+- **Brand**: a [Digikala Design System](https://assets.alamut.digikala.com/llms.txt) theme
+  generator. Pick a primary and a secondary color and it derives every DDS theme slot with
+  a formula reverse-engineered from the 20 brand themes already in the DDS. See
+  [Brand themes (DDS)](#brand-themes-dds).
+
 ## Run it in Figma
 
 Needs [pnpm](https://pnpm.io) and [Bun](https://bun.sh). pnpm installs the packages; the
@@ -41,7 +49,7 @@ plugin window, cmd-alt-P reruns the last plugin.
 
 ```
 pnpm typecheck      # UI and sandbox checked separately, sandbox without the DOM lib
-pnpm test           # golden + differential + sweep
+pnpm test           # golden + differential + sweep + brand
 pnpm test:ui        # builds, then drives dist/ui.html in a real DOM
 pnpm test:all       # all of the above
 ```
@@ -52,6 +60,7 @@ pnpm test:all       # all of the above
 | `test/differential.ts` | 4784 comparisons against the original minified functions, 0 mismatches |
 | `test/sweep.ts` | 1372 preset combinations produce no NaN and no malformed hex |
 | `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, buttons post the right messages |
+| `test/brand.ts` | step numbers match the DDS names, the recipe reproduces the DDS themes, on-colors match all 40 bases, and `DDS_RECIPE` still equals a fresh fit of the fixture |
 
 ## How the math works
 
@@ -118,6 +127,126 @@ tokenStart = n*100 ->  n, n+100, n+200 ...
 otherwise          ->  n, n+1, n+2 ...
 ```
 
+## Brand themes (DDS)
+
+### What a DDS theme is
+
+The DDS `theme` token group (the `🌈 Theme` collection in the DDS Core Figma file, one mode
+per brand) holds 21 variables:
+
+| Group | Variables |
+| --- | --- |
+| `primary` | `primary-tint-1`, `primary-tint-2`, `primary-tint-3`, `primary-gradient`, `primary-base`, `primary-shade-2`, `primary-shade-1`, `primary-base-alpha-12`, `on-primary` |
+| `secondary` | `secondary-tint-1`, `secondary-tint-2`, `secondary-base`, `secondary-base-alpha-12`, `secondary-shade-1`, `on-secondary` |
+| `tertiary` | `tertiary-tint-1`, `tertiary-tint-2`, `tertiary-base`, `tertiary-shade-1`, `on-tertiary` |
+| root | `theme`, the brand's display name |
+
+In the DDS every slot aliases a Core primitive such as `core/color/brand/shop/pomegranate-62`,
+and the `🌓 Mode` layer swaps slots for dark mode: `tint-1` and `shade-1` trade places as the
+brand surface, `tint-3` and `shade-2` as the secondary tone. Tertiary is the same set of
+neutrals in every brand.
+
+### Step numbers
+
+The number in a DDS color name is its darkness:
+
+```
+step = round(100 × (1 − luma))      luma = (0.299 R + 0.587 G + 0.114 B) / 255
+```
+
+That is Rec. 601 luma on the gamma-encoded channels, not OKLab or CIE lightness. It is exact
+for every neutral (`neutral-48` is `#848484`) and within 1 for 125 of the 147 named colors;
+the misses are colors that were edited after they were named.
+
+### The recipe
+
+Tints mix the base with white and shades mix it with black, in gamma-encoded sRGB, which is
+the same as stacking the color at some opacity over white or black. Luma is linear in those
+channels, so a mix moves the step number predictably. "Lighten to step n" means mix with
+white until the step reaches n; a base that is already lighter is used as is, which is what
+the DDS does when it collapses a slot onto the base.
+
+| Slot | Rule |
+| --- | --- |
+| `primary-tint-1` | lighten to step 3 |
+| `primary-tint-2` | base + 88% white, which is the alpha-12 color flattened onto white |
+| `primary-tint-3` | lighten to step 21 |
+| `primary-gradient` | the base (as in 12 of the 20 brands), unless a gradient color is picked |
+| `primary-base` | the input color |
+| `primary-shade-2` | base + 20% black |
+| `primary-shade-1` | base + 55% black |
+| `secondary-tint-1` | lighten to step 4 |
+| `secondary-tint-2` | base + 68% white |
+| `secondary-shade-1` | base + 41% black |
+| `*-base-alpha-12` | the base at 12% opacity |
+| `on-*` | white when white on the base reaches 2:1 contrast, otherwise `#0A0A0A` (neutral-96) |
+| `tertiary-*` | the DDS neutrals `#ECEDEF`, `#848484`, `#333333`, `#0A0A0A` and white, unless a tertiary color is picked; that one lightens to steps 7 and 48 and darkens to step 96, the steps of the neutral set |
+
+Slots never pass each other: if a light base would put a fixed-mix tint lighter than a
+fixed-step one (12% of a step-15 base is lighter than step 3), the slot takes its lighter
+neighbour's color instead, the way the DDS collapses slots.
+
+### How the recipe was derived
+
+`scripts/fit-recipe.ts` reads the DDS themes from `test/fixtures/dds-themes.json` and drops
+every slot that reuses another slot's color, since a collapsed slot says nothing about the
+recipe. For each remaining slot it compares two models, a fixed step target and a fixed mix
+amount, by leave-one-brand-out cross-validation, and keeps the one that best predicts the
+brand it was not fitted on.
+
+```
+slot               n   step model (fit / cv dE)   mix model (fit / cv dE)   chosen
+primary/tint-1      8   step 3    0.9 /  0.9       mix 94%   1.0 /  1.3      step 3
+primary/tint-2      6   step 6    2.1 /  2.5       mix 88%   2.1 /  2.4      mix 88%
+primary/tint-3     12   step 21   6.0 /  6.0       mix 64%   6.2 /  7.7      step 21
+primary/shade-2     6   step 70   9.0 / 13.2       mix 20%   4.5 /  4.7      mix 20%
+primary/shade-1     7   step 84   8.3 /  8.6       mix 55%   6.4 /  7.3      mix 55%
+secondary/tint-1   15   step 4    2.0 /  2.0       mix 93%   2.0 /  2.0      step 4
+secondary/tint-2   14   step 20   8.4 /  8.4       mix 68%   7.8 /  7.9      mix 68%
+secondary/shade-1  12   step 77  11.8 / 12.5       mix 41%  10.7 / 12.1      mix 41%
+```
+
+- The surface tints (primary tint-1, secondary tint-1) and the light text tone (tint-3) are
+  best explained by fixed steps: they look equally light whatever the hue.
+- Primary tint-2 is a fixed 12% of the base on white, the same color as `base-alpha-12`
+  flattened onto a white surface. Secondary tint-2 is a fixed mix too.
+- The shades are fixed mixes: the base, darker by a set share of black.
+- The script also tries amounts that depend on the base, on its lightness or on its warmth
+  (a term that peaks at yellow), cross-validated the same way. Neither beats the fixed rule
+  on any slot; the closest is a tie on shade-2. So there is no special case for yellow. A
+  yellow base simply sits at a low step (super-coin's base is step 28, shop's is 63), and
+  the same recipe lands on very different step numbers.
+- The on-color threshold sits between super-coin (1.93:1, dark text) and jet's secondary
+  (2.18:1, white text), so it matches all 40 bases. That is the DDS's own choice; WCAG text
+  contrast asks for 4.5:1.
+
+How close it gets, as mean ΔE (OKLab × 100, where about 2 is the visible threshold) against
+the hand-picked tokens: tint-1 0.9, primary tint-2 2.1, secondary tint-1 2.0, shade-2 4.5,
+tint-3 6.0, shade-1 6.4, secondary tint-2 7.8 and secondary shade-1 10.7. The larger numbers
+are where the brands disagree with each other: shop's tint-3 is step 35 and plus's is 20.
+The Recipe tab exposes every constant for a brand that wants to deviate, the way super-coin
+keeps its shades lighter than the recipe.
+
+### What the plugin writes
+
+**Create variables** writes a single theme layer, without Core primitives: a collection named
+`🌈 Theme` (editable) holding the 21 variables above, named exactly as in the DDS
+(`primary/primary-tint-1`, `theme` and so on), with raw color values in a mode named after
+the brand. Running it for another brand adds a mode; running it again for the same brand
+updates that mode. Figma caps the modes per collection by plan, which is why the DDS chains
+`🌈 Theme 2` and `🌈 Theme 3`. When the cap is hit, the plugin says so, and a new collection
+name starts a fresh one.
+
+**Create documentation** draws a token sheet on the current page: each group's slots from
+light to dark with step and hex, then a table of every variable with its usage. When the
+theme variables exist, the swatches are bound to them, so the sheet follows later edits.
+
+In the plugin window, the **Brand** tool has three tabs: **Colors** (brand name, primary,
+secondary, optional tertiary and gradient, target collection), **Recipe** (every fitted
+constant as a slider, with a reset to the DDS fit) and **Theme** (all 21 variables with
+value and step, plus a JSON export in the DDS tokens shape). The preview shows each group's
+white → base → black spectrum with a dot on every slot.
+
 ## Using the engine directly
 
 ```ts
@@ -156,6 +285,27 @@ const frame = await paintSwatchRow(stops);
 figma.currentPage.appendChild(frame);
 ```
 
+The brand engine works the same way:
+
+```ts
+import { generateBrandTheme } from './src/brand';
+
+const theme = generateBrandTheme({ name: 'Shop', primary: '#ED1944', secondary: '#1672DD' });
+
+theme.slots[0];
+// {
+//   group: 'primary', part: 'tint-1', key: 'primary-tint-1', name: 'primary/primary-tint-1',
+//   usage: 'Container and hint backgrounds, in effect a surface. ...',
+//   hex: '#FEF4F6', step: 3,            // the DDS's own shop tint-1 is #FEF5F7
+//   rgb: { r: 0.996, g: 0.957, b: 0.965, a: 1 },
+// }
+
+// In the sandbox: one theme layer, and a token sheet bound to it.
+import { writeBrandTheme, paintBrandDoc } from './src/figma';
+await writeBrandTheme(theme, { collectionName: '🌈 Theme' });
+const { frame: sheet } = await paintBrandDoc(theme, { collectionName: '🌈 Theme' });
+```
+
 ## Files
 
 The engine, platform-agnostic and dependency-free:
@@ -165,6 +315,7 @@ The engine, platform-agnostic and dependency-free:
 | [src/oklch.ts](src/oklch.ts) | OKLab/OKLCH/sRGB conversions, gamut mapping, hex and OKLCH formatting |
 | [src/curves.ts](src/curves.ts) | The seven presets, their parameter specs, and the solvers |
 | [src/palette.ts](src/palette.ts) | Config types, token numbering, `generatePalette`, CSS/JSON export |
+| [src/brand.ts](src/brand.ts) | DDS brand themes: step numbers, the fitted `DDS_RECIPE`, `generateBrandTheme` |
 | [src/index.ts](src/index.ts) | Re-exports the engine (not `figma.ts`) |
 
 The plugin around it:
@@ -176,8 +327,10 @@ The plugin around it:
 | [plugin/ui/main.ts](plugin/ui/main.ts) | UI iframe: controls, live preview, export panel |
 | [plugin/ui/index.html](plugin/ui/index.html) | UI shell and CSS: Figma UI3 tokens and control metrics over Figma's color variables, fluid, invisible resize edges |
 | [plugin/messages.ts](plugin/messages.ts) | The typed message contract between the two sides |
-| [src/figma.ts](src/figma.ts) | Figma paints, variables, canvas swatches |
+| [src/figma.ts](src/figma.ts) | Figma paints, variables, canvas swatches, the brand theme layer and its documentation sheet |
 | [scripts/build.ts](scripts/build.ts) | Bundles both sides into `dist/`, with `--watch` |
+| [scripts/fit-recipe.ts](scripts/fit-recipe.ts) | Refits the brand recipe from the DDS fixture and prints the cross-validation table |
+| [scripts/dds-fixture.ts](scripts/dds-fixture.ts) | Rebuilds `test/fixtures/dds-themes.json` from the DDS tokens API (needs network) |
 
 `src/figma.ts` is deliberately left out of `index.ts` because it touches the `figma`
 global. Import it only from the plugin sandbox entry, never from the UI iframe. The two
@@ -204,3 +357,9 @@ reproduce the ramps. If you ship this publicly, credit is the decent thing to do
 
 `test/fixtures/original-curves.mjs` holds the original minified curve functions, used only
 as a test oracle. It is not part of the shipped code.
+
+`test/fixtures/dds-themes.json` holds the DDS core colors and brand themes, taken from
+`https://assets.alamut.digikala.com/api/tokens` (the file records the commit it came from).
+It is the oracle the brand recipe is fitted and tested against, not shipped either. Refresh
+it with `bun scripts/dds-fixture.ts`, then run `bun scripts/fit-recipe.ts` and update
+`DDS_RECIPE` if the fit moved.

@@ -6,10 +6,12 @@
  */
 
 import { PaletteConfig } from '../src/palette';
-import { paintSwatchRow, writeVariables } from '../src/figma';
-import { PluginToUi, UiToPlugin, WindowSize } from './messages';
+import { paintBrandDoc, paintSwatchRow, writeBrandTheme, writeVariables } from '../src/figma';
+import { BrandSettings, PluginToUi, Tool, UiToPlugin, WindowSize } from './messages';
 
 const CONFIG_KEY = 'palette-maker:config';
+const BRAND_KEY = 'palette-maker:brand';
+const TOOL_KEY = 'palette-maker:tool';
 const SIZE_KEY = 'palette-maker:size';
 const DEFAULT_SIZE: WindowSize = { width: 420, height: 720 };
 
@@ -32,6 +34,15 @@ async function save(key: string, value: unknown): Promise<void> {
   } catch {
     // No manifest id, or storage unavailable. Not worth interrupting the user.
   }
+}
+
+/** Drop a new frame at the center of the view, selected and in sight. */
+function place(frame: FrameNode) {
+  frame.x = Math.round(figma.viewport.center.x - frame.width / 2);
+  frame.y = Math.round(figma.viewport.center.y - frame.height / 2);
+  figma.currentPage.appendChild(frame);
+  figma.currentPage.selection = [frame];
+  figma.viewport.scrollAndZoomIntoView([frame]);
 }
 
 function isSize(value: unknown): value is WindowSize {
@@ -61,12 +72,40 @@ async function main(): Promise<void> {
       switch (message.type) {
         case 'create-swatches': {
           const frame = await paintSwatchRow(message.stops, { label: message.label });
-          frame.x = figma.viewport.center.x - frame.width / 2;
-          frame.y = figma.viewport.center.y - frame.height / 2;
-          figma.currentPage.appendChild(frame);
-          figma.currentPage.selection = [frame];
-          figma.viewport.scrollAndZoomIntoView([frame]);
+          place(frame);
           post({ type: 'done', message: `Created ${message.stops.length} swatches` });
+          break;
+        }
+
+        case 'create-brand-variables': {
+          const result = await writeBrandTheme(message.theme, {
+            collectionName: message.collectionName,
+          });
+          const verb = result.addedMode ? 'Added' : 'Updated';
+          post({
+            type: 'done',
+            message:
+              `${verb} mode "${message.theme.name}" in ${result.collection.name}` +
+              (result.created ? `, ${result.created} new variables` : ''),
+          });
+          break;
+        }
+
+        case 'create-brand-doc': {
+          const { frame, bound } = await paintBrandDoc(message.theme, {
+            collectionName: message.collectionName,
+          });
+          place(frame);
+          post({
+            type: 'done',
+            message: `Created the ${message.theme.name} token sheet` + (bound ? ', bound to variables' : ''),
+          });
+          break;
+        }
+
+        case 'save-brand': {
+          await save(BRAND_KEY, message.brand);
+          await save(TOOL_KEY, message.tool);
           break;
         }
 
@@ -102,8 +141,12 @@ async function main(): Promise<void> {
     }
   };
 
-  const config = await load<PaletteConfig>(CONFIG_KEY);
-  post({ type: 'restore-config', config });
+  const [config, brand, tool] = await Promise.all([
+    load<PaletteConfig>(CONFIG_KEY),
+    load<BrandSettings>(BRAND_KEY),
+    load<Tool>(TOOL_KEY),
+  ]);
+  post({ type: 'restore-config', config, brand, tool });
 }
 
 void main();
