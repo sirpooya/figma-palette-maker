@@ -3,7 +3,7 @@
  * confirm the controls render, the ramp tracks the sliders, and the buttons post
  * the messages the sandbox expects.
  *
- * Run: bun run build && bun test/ui-smoke.ts
+ * Run: pnpm build && bun test/ui-smoke.ts
  */
 
 import { readFileSync } from 'node:fs';
@@ -13,7 +13,7 @@ await GlobalRegistrator.register({ url: 'https://localhost/' });
 
 const html = readFileSync(new URL('../dist/ui.html', import.meta.url), 'utf8');
 const inlined = html.match(/<script>([\s\S]*?)<\/script>/);
-if (!inlined) throw new Error('dist/ui.html has no inlined bundle. Run `bun run build` first.');
+if (!inlined) throw new Error('dist/ui.html has no inlined bundle. Run `pnpm build` first.');
 
 const posted: Array<{ type: string; [key: string]: unknown }> = [];
 // Mount the real shell from dist/ui.html (minus its script) so this harness cannot

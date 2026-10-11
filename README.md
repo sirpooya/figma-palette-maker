@@ -9,9 +9,12 @@ exactly, and every curve function is diff-tested against the original minified c
 
 ## Run it in Figma
 
+Needs [pnpm](https://pnpm.io) and [Bun](https://bun.sh). pnpm installs the packages; the
+build script and the tests run on Bun (`Bun.build` bundles both sides).
+
 ```
-bun install
-bun run build          # writes dist/code.js and dist/ui.html
+pnpm install
+pnpm build          # writes dist/code.js and dist/ui.html
 ```
 
 Then in the Figma desktop app: **Plugins > Development > Import plugin from manifest**,
@@ -28,7 +31,7 @@ room, and labels stack above their controls below 320px.
 While iterating:
 
 ```
-bun run dev            # rebuilds dist/ on every save, unminified
+pnpm dev            # rebuilds dist/ on every save, unminified
 ```
 
 Figma reloads the plugin each time you open it, so a save plus reopen is the loop. In the
@@ -37,10 +40,10 @@ plugin window, cmd-alt-P reruns the last plugin.
 ## Tests
 
 ```
-bun run typecheck      # UI and sandbox checked separately, sandbox without the DOM lib
-bun run test           # golden + differential + sweep
-bun run test:ui        # builds, then drives dist/ui.html in a real DOM
-bun run test:all       # all of the above
+pnpm typecheck      # UI and sandbox checked separately, sandbox without the DOM lib
+pnpm test           # golden + differential + sweep
+pnpm test:ui        # builds, then drives dist/ui.html in a real DOM
+pnpm test:all       # all of the above
 ```
 
 | Test | What it proves |
@@ -171,7 +174,7 @@ The plugin around it:
 | [manifest.json](manifest.json) | Figma manifest. `documentAccess: dynamic-page`, no network access |
 | [plugin/code.ts](plugin/code.ts) | Sandbox entry: handles messages, persists config in clientStorage |
 | [plugin/ui/main.ts](plugin/ui/main.ts) | UI iframe: controls, live preview, export panel |
-| [plugin/ui/index.html](plugin/ui/index.html) | UI shell and CSS: themed off Figma's color variables, fluid, invisible resize edges |
+| [plugin/ui/index.html](plugin/ui/index.html) | UI shell and CSS: Figma UI3 tokens and control metrics over Figma's color variables, fluid, invisible resize edges |
 | [plugin/messages.ts](plugin/messages.ts) | The typed message contract between the two sides |
 | [src/figma.ts](src/figma.ts) | Figma paints, variables, canvas swatches |
 | [scripts/build.ts](scripts/build.ts) | Bundles both sides into `dist/`, with `--watch` |
@@ -189,7 +192,7 @@ into `plugin/ui/index.html` at the `/*__APP_JS__*/` marker, which is why there i
 separate `ui.js` in `dist/`. The engine gets bundled into both sides, which costs a couple
 of kb and buys you the same palette math in the preview and on the canvas.
 
-`dist/` is gitignored. Anyone cloning this needs `bun install && bun run build` before
+`dist/` is gitignored. Anyone cloning this needs `pnpm install && pnpm build` before
 importing the manifest.
 
 ## Notes on provenance

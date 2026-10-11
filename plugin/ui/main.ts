@@ -122,10 +122,15 @@ function sliderRow(
     value: String(value),
   });
   const readout = el('span', { className: 'value', textContent: fmt(value) });
+  // Chromium has no range-progress pseudo-element, so the track gradient reads this.
+  const paintFill = (v: number) =>
+    input.style.setProperty('--fill', `${max > min ? ((v - min) / (max - min)) * 100 : 0}%`);
+  paintFill(value);
 
   input.oninput = () => {
     const v = Number(input.value);
     readout.textContent = fmt(v);
+    paintFill(v);
     onInput(v);
   };
   return row(label, input, readout);
@@ -228,7 +233,7 @@ function channelCard(channel: Channel): HTMLElement {
 
   const card = el('div', { className: 'card' }, [
     el('h2', { textContent: `${CHANNEL_LABELS[channel]} curve` }),
-    row('Curve', select),
+    row('Curve', el('div', { className: 'select-wrap' }, [select])),
     el('p', { className: 'equation', textContent: active?.equation ?? '' }),
     numberRow('Min', cfg.min, CHANNEL_STEP[channel], (v) => {
       config[channel] = reanchorChannel(channel, cfg.preset, v, config[channel].max);
@@ -357,7 +362,7 @@ function renderFooter() {
 
   footerEl.innerHTML = '';
   footerEl.append(
-    el('div', { className: 'actions' }, [variables, swatches]),
+    el('div', { className: 'actions' }, [swatches, variables]),
     el('div', { id: 'status' }),
   );
 }

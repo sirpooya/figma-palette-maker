@@ -1,19 +1,70 @@
 <meta charset="utf-8" />
 <style>
+  /*
+   * Figma UI3 look. Token names, values and component metrics come from Figma's own
+   * stylesheet (as mirrored in figma-variable-studio's figma.css). Colors read Figma's
+   * injected --figma-color-* first (themeColors: true), so inside Figma they are the
+   * live theme; the hex fallbacks are Figma's light/dark ramps for running outside it.
+   */
   :root {
-    color-scheme: light dark;
-    --bg: var(--figma-color-bg, #fff);
-    --bg-secondary: var(--figma-color-bg-secondary, #f5f5f5);
-    --bg-hover: var(--figma-color-bg-hover, #f0f0f0);
-    --border: var(--figma-color-border, #e6e6e6);
-    --text: var(--figma-color-text, #1a1a1a);
-    --text-secondary: var(--figma-color-text-secondary, #7a7a7a);
-    --brand: var(--figma-color-bg-brand, #0d99ff);
-    --brand-text: var(--figma-color-text-onbrand, #fff);
-    --danger: var(--figma-color-text-danger, #f24822);
-    --pad: clamp(8px, 2.5vw, 14px);
+    color-scheme: light;
+    --color-bg: var(--figma-color-bg, #fff);
+    --color-bg-hover: var(--figma-color-bg-hover, #f5f5f5);
+    --color-bg-secondary: var(--figma-color-bg-secondary, #f5f5f5);
+    --color-bg-tertiary: var(--figma-color-bg-tertiary, #e6e6e6);
+    --color-bg-brand: var(--figma-color-bg-brand, #0d99ff);
+    --color-bg-brand-hover: var(--figma-color-bg-brand-hover, #007be5);
+    --color-border: var(--figma-color-border, #e6e6e6);
+    --color-border-selected: var(--figma-color-border-selected, #0d99ff);
+    --color-icon: var(--figma-color-icon, #000000e5);
+    --color-icon-secondary: var(--figma-color-icon-secondary, #00000080);
+    --color-text: var(--figma-color-text, #000000e5);
+    --color-text-secondary: var(--figma-color-text-secondary, #00000080);
+    --color-text-tertiary: var(--figma-color-text-tertiary, #0000004d);
+    --color-text-onbrand: var(--figma-color-text-onbrand, #fff);
+    --color-text-danger: var(--figma-color-text-danger, #dc3412);
+    --color-scrollbar: #b3b3b380;
+    --color-texthighlight: #0d99ff66;
+    --swatch-outline: rgb(0 0 0 / 0.1);
+
+    --font-family-default: "Inter", ui-sans-serif, system-ui, -apple-system, "BlinkMacSystemFont",
+      "Segoe UI", "Roboto", "Helvetica Neue", "Arial", sans-serif;
+    --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-weight-default: 450;
+    --font-weight-strong: 550;
+    --text-size: 0.6875rem; /* 11px */
+    --text-line: 1rem;
+    --text-tracking: 0.00344rem;
+    --radius-small: 0.125rem;
+    --radius-medium: 0.3125rem;
+    --radius-full: 9999px;
+    --spacer-1: 0.25rem;
+    --spacer-2: 0.5rem;
+    --spacer-2-5: 0.75rem;
+    --spacer-3: 1rem;
+    --spacer-4: 1.5rem;
+    --elevation-100: 0px 1px 3px 0px #00000026, 0px 0px 0.5px 0px #0000004d;
+
+    --pad: clamp(8px, 2.5vw, 16px);
     --label: clamp(52px, 16vw, 72px);
   }
+  /* Figma tags the iframe's <html> with figma-dark when themeColors is on. */
+  .figma-dark {
+    color-scheme: dark;
+    --color-bg: var(--figma-color-bg, #2c2c2c);
+    --color-bg-hover: var(--figma-color-bg-hover, #383838);
+    --color-bg-secondary: var(--figma-color-bg-secondary, #383838);
+    --color-bg-tertiary: var(--figma-color-bg-tertiary, #444);
+    --color-border: var(--figma-color-border, #444);
+    --color-icon: var(--figma-color-icon, #fff);
+    --color-icon-secondary: var(--figma-color-icon-secondary, #ffffffb2);
+    --color-text: var(--figma-color-text, #fff);
+    --color-text-secondary: var(--figma-color-text-secondary, #ffffffb2);
+    --color-text-tertiary: var(--figma-color-text-tertiary, #fff6);
+    --color-text-danger: var(--figma-color-text-danger, #fca397);
+    --swatch-outline: rgb(255 255 255 / 0.1);
+  }
+
   * { box-sizing: border-box; min-width: 0; }
   html, body { height: 100%; }
   body {
@@ -21,83 +72,174 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font: 11px/1.4 Inter, -apple-system, system-ui, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    font-family: var(--font-family-default);
+    font-size: var(--text-size);
+    font-weight: var(--font-weight-default);
+    line-height: var(--text-line);
+    letter-spacing: var(--text-tracking);
+    font-feature-settings: "liga", "calt";
+    -webkit-font-smoothing: antialiased;
+    background: var(--color-bg);
+    color: var(--color-text);
+    cursor: default;
   }
+  ::selection { background-color: var(--color-texthighlight); }
 
   /* Preview, tabs and footer are pinned; only the middle region scrolls. */
-  #preview { flex: 0 0 auto; padding: var(--pad) var(--pad) 0; }
-  #tabs { flex: 0 0 auto; display: flex; gap: 2px; padding: 10px var(--pad) 0; }
+  #preview { flex: 0 0 auto; padding: var(--spacer-2) var(--pad) 0; }
+  #tabs {
+    flex: 0 0 auto;
+    display: flex;
+    gap: var(--spacer-1);
+    padding: var(--spacer-2) var(--pad);
+    border-bottom: 1px solid var(--color-border);
+  }
   #panels {
     flex: 1 1 auto;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
     scrollbar-gutter: stable;
-    padding: 10px var(--pad) var(--pad);
+    padding: 0 var(--pad) var(--spacer-2);
   }
   #footer {
     flex: 0 0 auto;
-    padding: 10px var(--pad);
-    border-top: 1px solid var(--border);
-    background: var(--bg);
+    padding: var(--spacer-2) var(--pad);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg);
   }
 
+  /* UI3 panel section title: strong body text on a 40px row, sentence case. */
   h2 {
-    margin: 0 0 8px;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    height: 40px;
+    margin: 0;
+    font-size: var(--text-size);
+    font-weight: var(--font-weight-strong);
+    line-height: var(--text-line);
+    color: var(--color-text);
   }
-  .card {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px;
-  }
-  .card + .card { margin-top: 8px; }
+  /* Figma separates property sections with hairlines, not boxed cards. */
+  .card { padding: 0 0 var(--spacer-2); }
+  .card + .card { border-top: 1px solid var(--color-border); }
+  #preview .card { padding: 0; }
 
   /* Label / control / readout. Only the control is allowed to shrink. */
   .row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 24px;
+    gap: var(--spacer-2);
+    min-height: var(--spacer-4);
   }
-  .row + .row { margin-top: 6px; }
+  .row + .row { margin-top: var(--spacer-2); }
   .row > label {
     flex: 0 0 var(--label);
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .row > .control { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; }
+  .row > .control { flex: 1 1 auto; display: flex; align-items: center; gap: var(--spacer-2); }
 
+  /* UI3 input: filled, borderless until hover, brand border on focus. */
   input[type="number"], input[type="text"], select {
     flex: 1 1 auto;
     width: 100%;
-    height: 24px;
-    padding: 0 6px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg);
-    color: var(--text);
+    height: var(--spacer-4);
+    padding: 0 7px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-medium);
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
     font: inherit;
+    letter-spacing: inherit;
+    outline: none;
   }
+  input[type="number"]:hover, input[type="text"]:hover, select:hover { border-color: var(--color-border); }
+  input[type="number"]:focus, input[type="text"]:focus, select:focus { border-color: var(--color-border-selected); }
+  input[type="number"] { font-variant-numeric: tabular-nums; }
+  input::placeholder { color: var(--color-text-tertiary); }
+
+  /* UI3 dropdown trigger: bordered, transparent, chevron on the right. */
+  select {
+    appearance: none;
+    padding-right: var(--spacer-4);
+    border-color: var(--color-border);
+    background: transparent;
+  }
+  .select-wrap { position: relative; flex: 1 1 auto; display: flex; }
+  .select-wrap::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    pointer-events: none;
+    background: var(--color-icon-secondary);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M5.646 6.646a.5.5 0 0 1 .708 0L8 8.293l1.646-1.647a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 0-.708'/%3E%3C/svg%3E") center / 16px no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M5.646 6.646a.5.5 0 0 1 .708 0L8 8.293l1.646-1.647a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 0-.708'/%3E%3C/svg%3E") center / 16px no-repeat;
+  }
+
+  /*
+   * Slider: Figma's thin rounded track with a brand fill up to the thumb and a white
+   * knob on elevation-100. --fill is the thumb position as a percentage, set from JS.
+   */
   input[type="range"] {
+    --fill: 50%;
     flex: 1 1 0;
     width: 100%;
     min-width: 0;
+    height: 16px;
     margin: 0;
-    accent-color: var(--brand);
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(to right, var(--color-bg-brand) var(--fill), var(--color-bg-tertiary) var(--fill));
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -4px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: var(--elevation-100);
+  }
+  input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px var(--color-border-selected), var(--elevation-100);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-tertiary);
+  }
+  input[type="range"]::-moz-range-progress {
+    height: 4px;
+    border-radius: var(--radius-full);
+    background: var(--color-bg-brand);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: var(--elevation-100);
   }
   .value {
     flex: 0 0 auto;
     min-width: 40px;
     text-align: right;
     font-variant-numeric: tabular-nums;
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
   }
 
   /* Preview. Height tracks the window so a tall panel gets a taller ramp. */
@@ -108,54 +250,61 @@
   }
   .ramp > div {
     flex: 1 1 0;
-    border-radius: 3px;
-    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.1);
+    border-radius: var(--radius-small);
+    box-shadow: inset 0 0 0 1px var(--swatch-outline);
     cursor: pointer;
     transition: transform 80ms ease;
   }
+  .ramp > div:first-child { border-top-left-radius: var(--radius-medium); border-bottom-left-radius: var(--radius-medium); }
+  .ramp > div:last-child { border-top-right-radius: var(--radius-medium); border-bottom-right-radius: var(--radius-medium); }
   .ramp > div:hover { transform: scaleY(1.06); }
   .meta {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    margin-top: 6px;
-    min-height: 15px;
+    gap: var(--spacer-2);
+    margin-top: var(--spacer-1);
+    min-height: var(--text-line);
     font-variant-numeric: tabular-nums;
-    color: var(--text-secondary);
+    color: var(--color-text-secondary);
   }
   .meta span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+  /* Figma's tab strip (the color picker's Custom / Libraries tabs). */
   .tab {
-    flex: 1 1 0;
-    height: 26px;
-    padding: 0 4px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--bg);
-    color: var(--text-secondary);
+    flex: 0 1 auto;
+    height: var(--spacer-4);
+    padding: 0 var(--spacer-2);
+    border: none;
+    border-radius: var(--radius-medium);
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
     font: inherit;
-    font-weight: 500;
-    cursor: pointer;
+    letter-spacing: inherit;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    outline: none;
+    user-select: none;
   }
-  .tab:hover { background: var(--bg-hover); }
+  .tab:hover { background: var(--color-bg-hover); }
   .tab[aria-selected="true"] {
-    background: var(--bg-secondary);
-    border-color: var(--text-secondary);
-    color: var(--text);
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    font-weight: var(--font-weight-strong);
   }
+  .tab:focus-visible { box-shadow: inset 0 0 0 1px var(--color-border-selected); }
 
   .equation {
-    margin: 0 0 8px;
-    padding: 4px 6px;
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-secondary);
-    font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin: var(--spacer-2) 0;
+    padding: var(--spacer-1) var(--spacer-2);
+    border-radius: var(--radius-medium);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    font: 10px/16px var(--font-mono);
+    letter-spacing: 0;
     overflow-x: auto;
     white-space: nowrap;
+    scrollbar-width: none;
   }
 
   /*
@@ -166,73 +315,79 @@
   .params {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-    gap: 6px 12px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px dashed var(--border);
+    gap: var(--spacer-2) var(--spacer-3);
+    margin-top: var(--spacer-2);
+    padding-top: var(--spacer-2);
+    border-top: 1px solid var(--color-border);
   }
   .params .row { margin: 0; }
   .params .row > label {
     flex: 0 0 auto;
     min-width: 14px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-style: italic;
-    color: var(--text);
+    color: var(--color-text);
   }
   .params .linkrow { grid-column: 1 / -1; }
 
+  /* UI3 buttons: 24px, medium radius. Secondary is outlined, primary is brand. */
   button {
-    height: 28px;
-    padding: 0 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
+    height: var(--spacer-4);
+    padding: 0 var(--spacer-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-medium);
+    background: transparent;
+    color: var(--color-text);
     font: inherit;
-    font-weight: 500;
-    cursor: pointer;
+    letter-spacing: inherit;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    outline: none;
   }
-  button:hover { background: var(--bg-hover); }
+  button:hover { background: var(--color-bg-hover); }
+  button:active { background: var(--color-bg-secondary); }
+  button:focus-visible { border-color: var(--color-border-selected); }
   button.primary {
-    background: var(--brand);
-    border-color: var(--brand);
-    color: var(--brand-text);
+    background: var(--color-bg-brand);
+    border-color: transparent;
+    color: var(--color-text-onbrand);
+    font-weight: var(--font-weight-strong);
   }
-  button.primary:hover { filter: brightness(1.08); }
-  .actions { display: flex; gap: 6px; }
+  button.primary:hover { background: var(--color-bg-brand-hover); }
+  button.primary:focus-visible { box-shadow: 0 0 0 1px var(--color-bg), 0 0 0 2px var(--color-border-selected); }
+  .actions { display: flex; gap: var(--spacer-2); }
   .actions > button { flex: 1 1 0; }
-  .linkrow { display: flex; gap: 6px; margin-top: 8px; }
-  .linkrow > button {
-    flex: 1 1 0;
-    height: 24px;
-    padding: 0 8px;
-    font-weight: 400;
-    color: var(--text-secondary);
-  }
+  .linkrow { display: flex; gap: var(--spacer-2); margin-top: var(--spacer-2); }
+  .linkrow > button { flex: 1 1 0; }
 
   textarea {
+    display: block;
     width: 100%;
     height: clamp(80px, 22vh, 300px);
     resize: vertical;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text);
-    font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-    padding: 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-medium);
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    font: 10px/16px var(--font-mono);
+    letter-spacing: 0;
+    padding: var(--spacer-1) 7px;
+    outline: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
   }
+  textarea:focus { border-color: var(--color-border-selected); }
   #status {
-    min-height: 14px;
-    margin-top: 8px;
-    color: var(--text-secondary);
+    min-height: var(--text-line);
+    margin-top: var(--spacer-1);
+    color: var(--color-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  #status[data-error="true"] { color: var(--danger); }
+  #status:empty { display: none; }
+  #status[data-error="true"] { color: var(--color-text-danger); }
 
   /*
    * Resize affordances. Figma exposes no native window resizing, so the edges of
@@ -256,13 +411,13 @@
     .row { flex-wrap: wrap; }
     .row > label { flex: 1 1 100%; }
     .row > .control { flex: 1 1 100%; }
-    .tab { font-size: 10px; padding: 0 2px; }
+    .tab { padding: 0 var(--spacer-1); }
   }
 
-  /* Roomy: the action pair and the naming fields can share rows. */
+  /* Roomy: the action pair can stop stretching. */
   @media (min-width: 560px) {
-    .card { padding: 12px; }
-    #footer .actions > button { flex: 0 1 auto; min-width: 150px; }
+    #footer .actions { justify-content: flex-end; }
+    #footer .actions > button { flex: 0 1 auto; min-width: 120px; }
   }
 </style>
 <div id="preview"></div>

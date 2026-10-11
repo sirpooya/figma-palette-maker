@@ -10,8 +10,8 @@
     "dev": "bun scripts/build.ts --watch",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sandbox.json",
     "test": "bun test/golden.ts && bun test/differential.ts && bun test/sweep.ts",
-    "test:ui": "bun run build && bun test/ui-smoke.ts",
-    "test:all": "bun run typecheck && bun run test && bun run test:ui"
+    "test:ui": "pnpm build && bun test/ui-smoke.ts",
+    "test:all": "pnpm typecheck && pnpm test && pnpm test:ui"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.2",

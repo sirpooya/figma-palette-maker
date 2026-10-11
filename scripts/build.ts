@@ -1,8 +1,8 @@
 /**
  * Build the Figma-importable bundle into dist/.
  *
- *   bun run build          one-shot, minified
- *   bun run dev            rebuild on every save
+ *   pnpm build          one-shot, minified
+ *   pnpm dev            rebuild on every save
  *
  * Figma needs exactly two files: a single self-contained JS for the sandbox and a
  * single self-contained HTML for the UI. So the UI bundle is inlined into the HTML.
