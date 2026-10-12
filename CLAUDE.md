@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Figma/FigJam plugin "Manshur Theme Builder" with two tools: **Curves**, an OKLCH color ramp
+Figma plugin (Figma only, no FigJam) "Manshur Theme Builder" with two tools: **Curves**, an OKLCH color ramp
 generator ported from sds.sallee.design/palette-maker, and **Brand**, a Digikala Design
 System (DDS) theme generator whose formula is reverse-engineered from the DDS's own brand
 themes. README.md has the full math write-up for both.
@@ -83,10 +83,16 @@ Rules that follow from the boundary:
   collection named after the brand, with no collection field in the UI (both the user's
   call, 2026-10-11). Do not add a Core collection, aliases or a collection picker without
   asking.
-- The Brand tool is headless (the user's call, 2026-10-11): the plugin bundles no recipe,
-  no default colors and no DDS values. It starts empty until a recipe is imported, which
-  then lives in clientStorage. `#ED1944` / `#1672DD` / `#333333` are placeholder hints
-  only, never values. Do not reintroduce a built-in default.
+- The shipped plugin never mentions DDS, Digikala or any source (the user's call,
+  2026-10-12): not in UI text, canvas output, recipe format or comments under `src/` and
+  `plugin/`. The repo is private, so the DDS tooling (fixture, fit script, `recipes/dds.json`,
+  docs) stays. The Brand tool starts with one built-in recipe, `src/starter.ts` ("Starter",
+  the same numbers as `recipes/dds.json`; `test/brand.ts` checks they match). An imported
+  recipe replaces it and lives in clientStorage; **Clear** removes the recipe entirely (saved as null, so it stays empty on reopen) and the
+  empty panel offers **Import recipe** and **Use starter**. Only a first run gets the starter.
+  Empty fields fall back to their placeholders (`Brand`, `#ED1944`, `#1672DD`; tertiary to the
+  recipe set), so a theme shows on first open (the user's call, 2026-10-12). The Create buttons look
+  disabled until a name is typed; clicking one then shows an error toast and focuses Name.
 - Never hand-tune `recipes/dds.json`. It is written by `scripts/fit-recipe.ts --write` from
   `test/fixtures/dds-themes.json`, and `test/brand.ts` fails when the two disagree. The fit
   found no hue dependence (yellow included), so do not add hue special cases either. A
@@ -104,7 +110,7 @@ Rules that follow from the boundary:
   a dot or bar being dragged keeps the pointer. The dots are the recipe's only per-slot
   controls (`setRule`). The smoke test drives dots with the arrow keys (happy-dom
   has no layout); real drags were checked in headless Chrome. Brand settings and the last tool
-  persist under the `palette-maker:brand` and `palette-maker:tool` clientStorage keys, and
+  persist under the `manshur-theme-builder:brand` and `manshur-theme-builder:tool` clientStorage keys, and
   `restoreBrand` fills gaps in settings saved by older builds.
 
 ### Build

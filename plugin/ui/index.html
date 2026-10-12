@@ -581,9 +581,8 @@
   }
   .color-field input[type="text"]:hover,
   .color-field input[type="text"]:focus { border: none; }
-  /* No color yet: the swatch previews the placeholder, faded. */
-  .color-field.empty input[type="color"] { opacity: 0.35; }
-  .color-field input[type="text"]::placeholder { text-transform: none; }
+  /* An empty field uses its placeholder as the value, so it reads as one: full swatch, normal text. */
+  .color-field input[type="text"]::placeholder { text-transform: none; color: var(--color-text); }
 
   /* A section title with its actions on the right, like Figma's panel headers. */
   .card-head { display: flex; align-items: center; gap: var(--spacer-2); min-height: 40px; }
@@ -603,6 +602,7 @@
   .empty-state .linkrow > button { flex: 0 1 auto; min-width: 120px; }
 
   button:disabled { opacity: 0.4; pointer-events: none; }
+  button[aria-disabled="true"]:not(:disabled) { opacity: 0.4; }
   input[type="color"] {
     flex: 0 0 auto;
     width: var(--spacer-4);

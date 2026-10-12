@@ -33,7 +33,7 @@ export type UiToPlugin =
       modeName: string;
     }
   | { type: 'save-config'; config: PaletteConfig }
-  /** Writes the DDS-shaped theme layer into a collection named after the brand. */
+  /** Writes the theme layer into a collection named after the brand. */
   | { type: 'create-brand-variables'; theme: BrandTheme }
   /** Draws the token sheet; binds it to the brand's variables when they exist. */
   | { type: 'create-brand-doc'; theme: BrandTheme }

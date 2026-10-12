@@ -1,5 +1,5 @@
 /**
- * The distribution curves behind the palette maker.
+ * The distribution curves behind the Curves tool.
  *
  * Every channel (lightness, chroma, hue) is a function of x, where x is the stop's
  * normalized position 0..1 across the ramp. Each preset carries:

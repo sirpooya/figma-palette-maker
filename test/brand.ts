@@ -20,6 +20,7 @@ import {
   stepOf,
 } from '../src/brand';
 import { rgbToHex } from '../src/oklch';
+import { STARTER_RECIPE } from '../src/starter';
 import { colorOf, collectSamples, fitRecipe, loadFixture, opaque } from '../scripts/fit-recipe';
 
 let failures = 0;
@@ -109,6 +110,7 @@ check('on-colors match the DDS', `${onMatches}/${onTotal}`, `${onTotal}/${onTota
 // The DDS recipe is a fit, not a guess: refitting the fixture must give the same recipe.
 const refit = fitRecipe(fixture);
 check('recipes/dds.json equals a fresh fit', JSON.stringify(DDS), JSON.stringify(refit.recipe));
+check('starter recipe equals recipes/dds.json', JSON.stringify(STARTER_RECIPE), JSON.stringify(DDS));
 // The default recipe is a file, not code, and recipe files round-trip.
 check('recipe files round-trip', JSON.stringify(parseRecipe(recipeToJson(DDS))), JSON.stringify(DDS));
 check('fit script output is the file', recipeToJson(refit.recipe, {

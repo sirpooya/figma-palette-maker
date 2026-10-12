@@ -207,18 +207,18 @@ check('brand tool pressed', tools()[1].getAttribute('aria-pressed'), 'true');
 check('no tabs in the Brand tool', tabs().length, 0);
 check('brand fields sit above the tabs', Boolean($('#form .color-field')), true);
 
-// Headless: no recipe and no colors until the user imports a recipe.
+// Empty fields fall back to their placeholders, so the starter theme shows at once.
 const nameField = () => rowNamed('Name')?.querySelector('input') as HTMLInputElement;
 const footerButtons = () => $$('#footer button') as HTMLButtonElement[];
 const previewEmpty = () => $('#preview')?.children.length === 0;
 const recipeEmptyState = () => $('#panels .empty-state button')?.textContent;
-check('no recipe, no spectra', $$('.spectrum').length, 0);
+check('placeholders give a theme', $$('.spectrum').length, 3);
 check('no preview without a theme', previewEmpty(), true);
 check('name starts empty', nameField().value, '');
 check('colors start empty', hexFields().map((f) => f.value).join(','), ',,');
 check('placeholders hint the colors', hexFields().map((f) => f.placeholder).join(','), 'ED1944,1672DD,333333');
-check('nothing to create yet', footerButtons().every((b) => b.disabled), true);
-check('the panel offers an import', recipeEmptyState(), 'Import recipe');
+check('theme shows before a name', $$('.token-group').length > 0, true);
+check('the starter recipe is loaded', recipeEmptyState(), undefined);
 
 // Importing goes through the real file input.
 const recipeInput = () => $('input[type="file"]') as HTMLInputElement;
@@ -231,19 +231,29 @@ const pick = async (name: string, text: string) => {
   await wait(50);
 };
 await pick('dds.json', await Bun.file(new URL('../recipes/dds.json', import.meta.url)).text());
-check('import is reported', last('notify')?.message, 'Imported the recipe from dds.json');
+check('import is reported', last('notify')?.message, 'Imported dds.json: same rules as the recipe already in use');
 check('still nothing to preview without colors', previewEmpty(), true);
 const resetShown = (name: string) => {
   const button = ($$('button') as HTMLButtonElement[]).find((b) => b.textContent === 'Reset');
-  return Boolean(button) && button!.style.display !== 'none' && button!.title === `Back to ${name}, as imported`;
+  return Boolean(button) && !button!.disabled && button!.title === `Back to ${name}, as imported`;
 };
 check('no reset while the recipe is as imported', resetShown('DDS fit'), false);
+check('an imported file can be cleared', ($$('#panels .card button') as HTMLButtonElement[]).some((b) => b.textContent === 'Clear' && !b.disabled), true);
 
+// The preview runs on placeholders, but Create waits for a typed name.
+const looksOff = () => footerButtons().every((b) => b.getAttribute('aria-disabled') === 'true');
+check('no name, Create looks disabled', looksOff(), true);
+click('Create variables');
+check('no name, nothing created', last('create-brand-variables'), undefined);
+check('no name gets a toast', last('notify')?.message, 'Add a brand name first');
+check('and the cursor goes to Name', document.activeElement, nameField());
 nameField().value = 'New brand';
+fire(nameField(), 'input');
+check('a typed name enables Create', looksOff() || footerButtons().some((b) => b.disabled), false);
 fire(nameField(), 'input');
 hexFields()[0].value = '#ed1944';
 fire(hexFields()[0], 'change');
-check('one color short, still nothing to create', footerButtons().every((b) => b.disabled), true);
+check('one color typed, the other from its placeholder', $$('.spectrum').length, 3);
 hexFields()[1].value = '#1672dd';
 fire(hexFields()[1], 'change');
 check('one spectrum per group', $$('.spectrum').length, 3);
@@ -345,14 +355,14 @@ check(
     .filter((b) => b.style.display !== 'none')
     .map((b) => b.textContent)
     .join(','),
-  'Clear,Import,Export',
+  'Reset,Clear,Import,Export',
 );
 click('Export');
 URL.createObjectURL = realCreate;
 HTMLAnchorElement.prototype.click = realAnchorClick;
 check('export downloads a recipe file', downloadName, 'new-brand-recipe.json');
 const exportedRecipe = JSON.parse(await (downloadBlob as Blob | null)!.text());
-check('export is a recipe file', exportedRecipe.format, 'palette-maker-recipe');
+check('export is a recipe file', exportedRecipe.format, 'manshur-theme-recipe');
 check('export carries the rules', JSON.stringify(exportedRecipe.primary['tint-2']), '{"white":88}');
 check('export carries the fixed colors', exportedRecipe.tertiaryDefault?.base, '#333333');
 
@@ -406,16 +416,28 @@ check('recipe saved', Boolean(saved?.brand?.recipe), true);
 check('imported name saved', saved?.brand?.imported?.name, 'New brand');
 check('tool saved', saved?.tool, 'brand');
 
-// Clear removes the recipe, saved copy included, and leaves the colors.
+// Clear removes the recipe entirely; Use starter brings the built-in one back.
+const own = JSON.parse(await Bun.file(new URL('../recipes/dds.json', import.meta.url)).text());
+own.name = 'Own';
+own.alpha = 20;
+await pick('own.json', JSON.stringify(own));
+const clearLive = () => ($$('#panels .card button') as HTMLButtonElement[]).some((b) => b.textContent === 'Clear' && !b.disabled);
+check('own recipe makes Clear live', clearLive(), true);
+check('own recipe applies', ($$('.strip-value')[1] as HTMLElement).textContent, '20%');
 click('Clear');
-check('clear empties the recipe tab', recipeEmptyState(), 'Import recipe');
+check('clear empties the panel', recipeEmptyState(), 'Import recipe');
 check('clear removes the strips', $$('.spectrum').length, 0);
 check('nothing to create after clear', footerButtons().every((b) => b.disabled), true);
+check('clear names what it removed', last('notify')?.message, 'Removed the recipe "Own"');
 check('clear keeps the colors', hexFields()[0].value, '7F53EF');
 await wait(300);
 check('clear is saved', (last('save-brand') as { brand: { recipe: unknown } } | undefined)?.brand?.recipe, null);
+click('Use starter');
+check('starter is back', ($$('.strip-value')[1] as HTMLElement).textContent, '12%');
+await wait(300);
+check('starter is saved', (last('save-brand') as { brand: { imported: { name: string } } } | undefined)?.brand?.imported?.name, 'Starter');
 
-// Restoring settings without a recipe stays headless; with one, it comes straight back.
+// A saved cleared recipe stays cleared; a saved recipe comes straight back.
 const restore = (brand: unknown) =>
   window.dispatchEvent(
     new MessageEvent('message', {
@@ -425,7 +447,7 @@ const restore = (brand: unknown) =>
 restore({ input: { name: 'Saved', primary: '#00a049', secondary: '#1672dd' } });
 check('restored brand name', nameField().value, 'Saved');
 check('restored primary', hexFields()[0].value, '00A049');
-check('no saved recipe stays headless', previewEmpty() && recipeEmptyState() === 'Import recipe', true);
+check('a cleared recipe stays cleared', recipeEmptyState(), 'Import recipe');
 restore(saved?.brand);
 check('saved recipe comes back', $$('.spectrum').length, 3);
 

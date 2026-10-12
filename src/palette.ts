@@ -143,7 +143,7 @@ export function generatePalette(config: PaletteConfig): PaletteStop[] {
 /* Built-in configs                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** The palette maker's default: 16 stops, arctan lightness, flat chroma and hue. */
+/** The default ramp: 16 stops, arctan lightness, flat chroma and hue. */
 export function defaultConfig(): PaletteConfig {
   return {
     stops: 16,

@@ -1,18 +1,16 @@
 /**
- * DDS brand themes: derive every Digikala Design System theme slot from a brand's base
- * colors, with a recipe reverse-engineered from the DDS's own brand themes.
+ * Brand themes: derive every theme slot from a brand's base colors, following a recipe the
+ * user imports.
  *
  * Two facts carry the whole thing:
- *   1. The number in a DDS color name is its darkness, step = round(100 * (1 - luma)),
+ *   1. A color's step is its darkness, step = round(100 * (1 - luma)),
  *      with Rec. 601 luma on the gamma-encoded channels.
  *   2. Tints are the base mixed with white and shades the base mixed with black, in that
  *      same gamma-encoded space. Luma is linear there, so a mix moves the step linearly
  *      and "lighten to step n" has a closed form.
  *
  * The engine is headless: it holds no recipe and no colors of its own. Every number and
- * every fixed color comes from a recipe file the user imports. The DDS one is
- * recipes/dds.json, fitted from test/fixtures/dds-themes.json by scripts/fit-recipe.ts
- * (`--write` rewrites it); test/brand.ts fails if the two drift apart.
+ * every fixed color comes from a recipe file the user imports.
  */
 
 import { Rgb, clamp01, rgbToHex, rgbToOklch } from './oklch';
@@ -26,7 +24,7 @@ export type SlotPart = DerivedPart | 'gradient' | 'base' | 'alpha' | 'on';
 
 /**
  * How one slot is reached from the base. Tints move toward white and shades toward black:
- * `step` mixes until the color lands on that DDS step, `mix` uses a fixed share of white or
+ * `step` mixes until the color lands on that step, `mix` uses a fixed share of white or
  * black (0..1). A base already past a step target is used as is.
  */
 export type SlotRule = { kind: 'step'; step: number } | { kind: 'mix'; amount: number };
@@ -41,11 +39,11 @@ export interface BrandRecipe {
   tertiary: Record<'tint-1' | 'tint-2' | 'shade-1', SlotRule>;
   /** White text and icons when white on the base reaches this contrast ratio. */
   onContrast: number;
-  /** Text and icons on bases below the threshold (DDS: neutral-96). */
+  /** Text and icons on bases below the threshold. */
   onDark: string;
   /** Opacity of the `*-base-alpha-12` slots. */
   alpha: number;
-  /** The tertiary set to use when no tertiary color is given (DDS: its neutrals), or null. */
+  /** The tertiary set to use when no tertiary color is given, or null. */
   tertiaryDefault: TertiaryDefault | null;
 }
 
@@ -56,7 +54,7 @@ const TERTIARY_DEFAULT_KEYS: Array<keyof TertiaryDefault> = ['base', 'tint-1', '
 /* -------------------------------------------------------------------------- */
 
 /** Marks a JSON file as a Manshur Theme Builder recipe. */
-export const RECIPE_FORMAT = 'palette-maker-recipe';
+export const RECIPE_FORMAT = 'manshur-theme-recipe';
 export const RECIPE_VERSION = 1;
 
 /** The slots a recipe sets, per group, in file order. */
@@ -191,11 +189,11 @@ export function parseRecipe(text: string): BrandRecipe {
 export interface SlotSpec {
   group: BrandGroup;
   part: SlotPart;
-  /** DDS token key, e.g. `primary-tint-1`. */
+  /** Token key, e.g. `primary-tint-1`. */
   key: string;
   /** Figma variable name, e.g. `primary/primary-tint-1`. */
   name: string;
-  /** What the slot is for, from the DDS descriptions and its light/dark mode mapping. */
+  /** What the slot is for, and how it maps between light and dark mode. */
   usage: string;
 }
 
@@ -203,7 +201,7 @@ function slot(group: BrandGroup, part: SlotPart, key: string, usage: string): Sl
   return { group, part, key, name: `${group}/${key}`, usage };
 }
 
-/** Every DDS theme slot, in the DDS's own order. */
+/** Every theme slot, in variable order. */
 export const BRAND_SLOTS: readonly SlotSpec[] = [
   slot('primary', 'tint-1', 'primary-tint-1', 'Container and hint backgrounds, in effect a surface. Dark mode uses shade-1 here.'),
   slot('primary', 'tint-2', 'primary-tint-2', 'Tonal actions and labels.'),
@@ -212,12 +210,12 @@ export const BRAND_SLOTS: readonly SlotSpec[] = [
   slot('primary', 'base', 'primary-base', 'The brand color.'),
   slot('primary', 'shade-2', 'primary-shade-2', 'Deep brand tone. Dark mode uses it where light mode uses tint-3.'),
   slot('primary', 'shade-1', 'primary-shade-1', 'Darkest brand tone; the brand surface in dark mode.'),
-  slot('primary', 'alpha', 'primary-base-alpha-12', 'Progress bars and maps.'),
+  slot('primary', 'alpha', 'primary-base-alpha-12', 'Translucent brand fills, such as progress tracks and highlights.'),
   slot('primary', 'on', 'on-primary', 'Text and icons on the brand color.'),
   slot('secondary', 'tint-1', 'secondary-tint-1', 'Secondary surface. Dark mode uses shade-1 here.'),
   slot('secondary', 'tint-2', 'secondary-tint-2', 'Lighter secondary tone; the secondary shade in dark mode.'),
   slot('secondary', 'base', 'secondary-base', 'The secondary color.'),
-  slot('secondary', 'alpha', 'secondary-base-alpha-12', 'Borders.'),
+  slot('secondary', 'alpha', 'secondary-base-alpha-12', 'Translucent secondary fills and borders.'),
   slot('secondary', 'shade-1', 'secondary-shade-1', 'Darkest secondary tone; the secondary surface in dark mode.'),
   slot('secondary', 'on', 'on-secondary', 'Text and icons on the secondary color.'),
   slot('tertiary', 'tint-1', 'tertiary-tint-1', 'Tertiary surface.'),
@@ -270,12 +268,12 @@ export function luma(color: Rgb): number {
   return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
 }
 
-/** The DDS step number: `pomegranate-62` is 62 because its luma is 38%. */
+/** The step number: a color with 38% luma is step 62. */
 export function stepOf(color: Rgb): number {
   return Math.round(100 * (1 - luma(color)));
 }
 
-/** Two digits, as the DDS writes them: 3 -> "03". */
+/** Always two digits: 3 -> "03". */
 export function stepLabel(step: number): string {
   return String(step).padStart(2, '0');
 }
@@ -351,11 +349,11 @@ export interface BrandInput {
   primary: string;
   secondary: string;
   /**
-   * Empty, or the recipe's `tertiaryDefault.base`, gives that fixed set (the DDS neutrals in
-   * the DDS recipe); any other color runs through the tertiary rules.
+   * Empty, or the recipe's `tertiaryDefault.base`, gives that fixed set; any other color runs
+   * through the tertiary rules.
    */
   tertiary?: string | null;
-  /** Leave empty to use the primary base, as most DDS brands do. */
+  /** Leave empty to use the primary base. */
   gradient?: string | null;
 }
 
@@ -364,7 +362,7 @@ export interface BrandSlot extends SlotSpec {
   hex: string;
   /** 0..1 channels, ready for a Figma paint or variable. */
   rgb: { r: number; g: number; b: number; a: number };
-  /** DDS step of the opaque color. */
+  /** Step of the opaque color. */
   step: number;
 }
 
@@ -380,7 +378,7 @@ function derivedRule(recipe: BrandRecipe, group: BrandGroup, part: DerivedPart):
   return rule;
 }
 
-/** Each group's slots from lightest to darkest, the order the DDS keeps them in. */
+/** Each group's slots from lightest to darkest. */
 export const BRAND_LIGHT_TO_DARK: Record<BrandGroup, SlotPart[]> = {
   primary: ['tint-1', 'tint-2', 'tint-3', 'base', 'shade-2', 'shade-1'],
   secondary: ['tint-1', 'tint-2', 'base', 'shade-1'],
@@ -428,8 +426,8 @@ export function generateBrandTheme(input: BrandInput, recipe: BrandRecipe): Bran
   }
 
   // A light base can push a fixed-mix tint past a fixed-step one (12% of a step-15 base is
-  // lighter than step 3). The DDS never orders slots out of light-to-dark; it collapses
-  // them instead, so a slot that would overtake its lighter neighbour takes its color.
+  // lighter than step 3). Slots never go out of light-to-dark order; they collapse
+  // instead, so a slot that would overtake its lighter neighbour takes its color.
   for (const group of BRAND_GROUPS) {
     let previous: Rgb | null = null;
     for (const part of BRAND_LIGHT_TO_DARK[group]) {
@@ -490,7 +488,7 @@ function cssValue(s: BrandSlot): string {
   return `rgba(${ch(s.rgb.r)},${ch(s.rgb.g)},${ch(s.rgb.b)},${Number(s.rgb.a.toFixed(2))})`;
 }
 
-/** The theme in the DDS tokens JSON shape: `{ <brand>: { primary: { ... }, theme } }`. */
+/** The theme as design tokens JSON: `{ <brand>: { primary: { ... }, theme } }`. */
 export function brandThemeToJson(theme: BrandTheme): string {
   const body: Record<string, unknown> = {};
   for (const group of BRAND_GROUPS) {

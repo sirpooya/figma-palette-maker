@@ -1,8 +1,8 @@
 {
-  "name": "figma-palette-maker",
+  "name": "manshur-theme-builder",
   "version": "0.1.0",
   "private": true,
-  "description": "OKLCH palette generation engine, ported from sds.sallee.design/palette-maker for use in a Figma plugin",
+  "description": "Figma plugin: OKLCH color ramps and recipe-driven brand themes, written to variables",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

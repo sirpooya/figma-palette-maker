@@ -1,5 +1,5 @@
 {
-  "format": "palette-maker-recipe",
+  "format": "manshur-theme-recipe",
   "version": 1,
   "name": "DDS fit",
   "description": "Fitted to the 20 DDS brand themes (tokens commit 0d9585f) by scripts/fit-recipe.ts. step: mix until the color lands on that DDS step. white / black: share of white in a tint or black in a shade, in percent. onContrast: white text from this contrast ratio up, onDark below it. alpha: opacity of the base-alpha-12 slots, in percent. tertiaryDefault: the fixed tertiary used when no tertiary color is picked.",

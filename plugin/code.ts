@@ -9,10 +9,10 @@ import { PaletteConfig } from '../src/palette';
 import { paintBrandDoc, paintSwatchRow, writeBrandTheme, writeVariables } from '../src/figma';
 import { BrandSettings, PluginToUi, Tool, UiToPlugin, WindowSize } from './messages';
 
-const CONFIG_KEY = 'palette-maker:config';
-const BRAND_KEY = 'palette-maker:brand';
-const TOOL_KEY = 'palette-maker:tool';
-const SIZE_KEY = 'palette-maker:size';
+const CONFIG_KEY = 'manshur-theme-builder:config';
+const BRAND_KEY = 'manshur-theme-builder:brand';
+const TOOL_KEY = 'manshur-theme-builder:tool';
+const SIZE_KEY = 'manshur-theme-builder:size';
 const DEFAULT_SIZE: WindowSize = { width: 420, height: 720 };
 
 function post(message: PluginToUi) {

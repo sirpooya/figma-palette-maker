@@ -1,8 +1,8 @@
 /**
  * OKLCH <-> sRGB color math, plus CSS Color 4 gamut mapping.
  *
- * Ported from the culori conversion chain used by sds.sallee.design/palette-maker,
- * with the exact same matrix coefficients so output matches byte for byte.
+ * The OKLab matrices are culori's exact coefficients (MIT), so output matches culori
+ * byte for byte.
  * Zero dependencies, so it runs inside the Figma plugin sandbox as-is.
  */
 
@@ -178,7 +178,7 @@ export function rgbToHex(color: Rgb): string {
   return ('#' + packed.toString(16).slice(1)).toUpperCase();
 }
 
-/** `oklch(62.62% 0.20 286.4)`, using the palette maker's exact rounding rules. */
+/** `oklch(62.62% 0.20 286.4)`, with fixed rounding rules. */
 export function formatOklch(lPercent: number, c: number, h: number): string {
   const l = Number.isInteger(lPercent) ? String(lPercent) : lPercent.toFixed(2);
   const chroma = c.toFixed(c < 0.01 ? 3 : 2);

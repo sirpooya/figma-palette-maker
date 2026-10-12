@@ -28,6 +28,7 @@ import {
 } from '../../src/brand';
 import { Channel, PRESET_LIST, PresetId } from '../../src/curves';
 import { Rgb, rgbToHex } from '../../src/oklch';
+import { STARTER_NAME, STARTER_RECIPE } from '../../src/starter';
 import {
   MAX_STOPS,
   MIN_STOPS,
@@ -392,9 +393,8 @@ function renderFooter() {
 /* -------------------------------------------------------------------------- */
 
 /*
- * Headless: the plugin ships no recipe and no colors. Nothing generates until the user
- * imports a recipe file, which is then kept in clientStorage (on their machine) with the
- * rest of the Brand settings. The DDS recipe is recipes/dds.json in the repo.
+ * The plugin ships one starter recipe and no colors. An imported recipe replaces it and is
+ * kept in clientStorage (on the user's machine) with the rest of the Brand settings.
  */
 
 const GROUP_LABELS: Record<BrandGroup, string> = {
@@ -411,17 +411,30 @@ const PART_LABELS: Record<string, string> = {
   'shade-1': 'Shade 1',
 };
 
-/** Hints only: shown in the empty fields, never used as values. */
-const PLACEHOLDERS = { name: 'Brand name', primary: '#ED1944', secondary: '#1672DD', tertiary: '#333333' };
+/** Shown in the empty fields and used in their place, so a theme shows before any typing. */
+const PLACEHOLDERS = { name: 'Brand', primary: '#ED1944', secondary: '#1672DD', tertiary: '#333333' };
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 function defaultBrand(): BrandSettings {
   return {
     input: { name: '', primary: '', secondary: '', tertiary: '' },
-    recipe: null,
-    imported: null,
+    recipe: clone(STARTER_RECIPE),
+    imported: { name: STARTER_NAME, recipe: clone(STARTER_RECIPE) },
   };
+}
+
+/** Loads the built-in starter recipe, from the empty state after a Clear. */
+function starterButton(): HTMLButtonElement {
+  const button = el('button', { textContent: 'Use starter' });
+  button.onclick = () => {
+    brand.recipe = clone(STARTER_RECIPE);
+    brand.imported = { name: STARTER_NAME, recipe: clone(STARTER_RECIPE) };
+    render();
+    saveBrand();
+    setStatus('Using the starter recipe');
+  };
+  return button;
 }
 
 /** A recipe from storage, checked through the file format; anything malformed is dropped. */
@@ -433,7 +446,10 @@ function storedRecipe(value: unknown): BrandRecipe | null {
   }
 }
 
-/** Settings saved by an older build may lack fields; fill the gaps, never invent a recipe. */
+/**
+ * Settings saved by an older build may lack fields; fill the gaps. A saved null recipe means
+ * the user cleared it, so it stays empty; only a first run (nothing saved) gets the starter.
+ */
 function restoreBrand(saved: BrandSettings): BrandSettings {
   const recipe = storedRecipe(saved.recipe);
   const importedRecipe = storedRecipe(saved.imported?.recipe);
@@ -475,18 +491,14 @@ function regenerate() {
     brandNotice = 'Import a recipe to start.';
     return;
   }
-  const missing = [
-    !brand.input.name.trim() && 'a brand name',
-    !brand.input.primary.trim() && 'a primary color',
-    !brand.input.secondary.trim() && 'a secondary color',
-  ].filter((x): x is string => Boolean(x));
-  if (missing.length) {
-    const list = missing.length > 1 ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}` : missing[0];
-    brandNotice = `Add ${list}.`;
-    return;
-  }
+  const input = {
+    ...brand.input,
+    name: brand.input.name.trim() || PLACEHOLDERS.name,
+    primary: brand.input.primary.trim() || PLACEHOLDERS.primary,
+    secondary: brand.input.secondary.trim() || PLACEHOLDERS.secondary,
+  };
   try {
-    brandTheme = generateBrandTheme(brand.input, brand.recipe);
+    brandTheme = generateBrandTheme(input, brand.recipe);
   } catch (error) {
     brandError = error instanceof Error ? error.message : String(error);
   }
@@ -510,11 +522,16 @@ recipeFile.onchange = async () => {
     const recipe = parseRecipe(text);
     const named = (JSON.parse(text) as { name?: unknown }).name;
     const name = typeof named === 'string' && named.trim() ? named.trim() : picked.name.replace(/\.json$/i, '');
+    const same = JSON.stringify(recipe) === JSON.stringify(brand.recipe);
     brand.recipe = recipe;
     brand.imported = { name, recipe: clone(recipe) };
     render();
     saveBrand();
-    setStatus(`Imported the recipe from ${picked.name}`);
+    setStatus(
+      same
+        ? `Imported ${picked.name}: same rules as the recipe already in use`
+        : `Imported the recipe from ${picked.name}`,
+    );
   } catch (error) {
     setStatus(`${picked.name}: ${error instanceof Error ? error.message : String(error)}`, true);
   }
@@ -727,7 +744,7 @@ function renderBrandTabs() {
 
 /**
  * A native color picker paired with a hex field; either one drives the other. Empty is a
- * valid state: the field shows the placeholder and the swatch shows it faded.
+ * valid state: the field shows the placeholder, which is then used as the value.
  */
 function colorField(value: string, placeholder: string, onChange: (hex: string) => void): HTMLElement {
   // Shown without the "#", like Figma's own color fields; typed or pasted either way.
@@ -776,6 +793,7 @@ function colorField(value: string, placeholder: string, onChange: (hex: string) 
  */
 function renderBrandForm() {
   const name = el('input', { type: 'text', value: brand.input.name, placeholder: PLACEHOLDERS.name });
+  nameInput = name;
   name.oninput = () => {
     brand.input.name = name.value;
     refreshBrand();
@@ -795,7 +813,7 @@ function renderBrandForm() {
     el('div', { className: 'color-grid' }, [
       color('Primary', 'primary', PLACEHOLDERS.primary),
       color('Secondary', 'secondary', PLACEHOLDERS.secondary),
-      // Left empty, the tertiary is the recipe's fixed set (the DDS neutrals in the DDS recipe).
+      // Left empty, the tertiary is the recipe's fixed set.
       color('Tertiary', 'tertiary', brand.recipe?.tertiaryDefault?.base ?? PLACEHOLDERS.tertiary),
     ]),
     row('Name', name),
@@ -826,20 +844,21 @@ function recipeRulesCard(recipe: BrandRecipe): HTMLElement {
     };
     resetRow = reset;
     actions.push(reset);
-    syncReset();
   } else {
     resetRow = null;
   }
-  // Clear drops the recipe (and its saved copy) and returns the tool to its empty start.
-  const clear = el('button', { textContent: 'Clear', title: 'Remove the current recipe' });
+  // Clear removes the recipe, saved copy included, and leaves the tool empty.
+  const clear = el('button', { textContent: 'Clear', title: 'Remove the recipe' });
   clear.onclick = () => {
+    const name = brand.imported?.name ?? 'recipe';
     brand.recipe = null;
     brand.imported = null;
     render();
     saveBrand();
-    setStatus('Removed the recipe');
+    setStatus(`Removed the recipe "${name}"`);
   };
   actions.push(clear, importButton('Import'), exportButton);
+  syncReset();
 
   const strips = el('div', { className: 'strips' });
   stripsHost = strips;
@@ -943,13 +962,11 @@ function applyRecipeEdit() {
   saveBrand();
 }
 
-/** The reset button, shown only while the recipe differs from the file it was imported from. */
-let resetRow: HTMLElement | null = null;
+/** Reset is always on the heading row, live while the recipe differs from what was loaded. */
+let resetRow: HTMLButtonElement | null = null;
 
 function syncReset() {
-  if (!resetRow) return;
-  const edited = JSON.stringify(brand.recipe) !== JSON.stringify(brand.imported?.recipe);
-  resetRow.style.display = edited ? '' : 'none';
+  if (resetRow) resetRow.disabled = JSON.stringify(brand.recipe) === JSON.stringify(brand.imported?.recipe);
 }
 
 /* Theme --------------------------------------------------------------------- */
@@ -1004,9 +1021,9 @@ function renderBrandPanel() {
   if (!recipe) {
     panelsEl.append(
       emptyState(
-        'No recipe yet. Import a recipe file to start; it is kept in the plugin on this ' +
-          'computer, so it is still here next time.',
-        [importButton()],
+        'No recipe. Import a recipe file, or use the built-in starter; it is kept in the ' +
+          'plugin on this computer, so it is still here next time.',
+        [importButton(), starterButton()],
       ),
     );
     return;
@@ -1025,10 +1042,10 @@ function renderThemeList() {
 
 function renderBrandFooter() {
   const variables = el('button', { className: 'primary', textContent: 'Create variables' });
-  variables.onclick = () => brandTheme && send({ type: 'create-brand-variables', theme: brandTheme });
+  variables.onclick = () => named() && brandTheme && send({ type: 'create-brand-variables', theme: brandTheme });
 
   const doc = el('button', { textContent: 'Create documentation' });
-  doc.onclick = () => brandTheme && send({ type: 'create-brand-doc', theme: brandTheme });
+  doc.onclick = () => named() && brandTheme && send({ type: 'create-brand-doc', theme: brandTheme });
 
   brandActions.splice(0, brandActions.length, doc, variables);
   syncBrandActions();
@@ -1036,9 +1053,28 @@ function renderBrandFooter() {
   footerEl.append(el('div', { className: 'actions' }, [doc, variables]));
 }
 
-/** Nothing to create until there is a theme. */
+/**
+ * Nothing to create without a theme. With a theme but no typed name (the collection is named
+ * after it), the buttons look disabled but still take the click, so it can say why.
+ */
 function syncBrandActions() {
-  for (const button of brandActions) button.disabled = !brandTheme;
+  const unnamed = !brand.input.name.trim();
+  for (const button of brandActions) {
+    button.disabled = !brandTheme;
+    button.setAttribute('aria-disabled', String(!brandTheme || unnamed));
+    button.title = brandTheme && unnamed ? 'Add a brand name first' : '';
+  }
+}
+
+/** The Name field, so Create can put the cursor there. */
+let nameInput: HTMLInputElement | null = null;
+
+/** Create needs a typed name: without one, say so in a toast and put the cursor in Name. */
+function named(): boolean {
+  if (brand.input.name.trim()) return true;
+  setStatus('Add a brand name first', true);
+  nameInput?.focus();
+  return false;
 }
 
 function renderBrand() {

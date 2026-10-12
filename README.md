@@ -11,9 +11,10 @@ The plugin has two tools:
 
 - **Curves**: the palette maker port. Three OKLCH curves produce a ramp of any length.
 - **Brand**: a [Digikala Design System](https://assets.alamut.digikala.com/llms.txt) theme
-  generator. It ships empty: import a recipe (the DDS one, reverse-engineered from the 20
-  brand themes already in the DDS, is [recipes/dds.json](recipes/dds.json)), pick a primary
-  and a secondary color, and it derives every DDS theme slot. See
+  generator. It starts with a built-in Starter recipe (the same numbers as
+  [recipes/dds.json](recipes/dds.json), reverse-engineered from the 20 brand themes already
+  in the DDS, but named neutrally), or import your own; pick a primary and a secondary
+  color, and it derives every DDS theme slot. See
   [Brand themes (DDS)](#brand-themes-dds).
 
 ## Run it in Figma
@@ -60,7 +61,7 @@ pnpm test:all       # all of the above
 | `test/golden.ts` | all 16 default stops match the live site's rendered output |
 | `test/differential.ts` | 4784 comparisons against the original minified functions, 0 mismatches |
 | `test/sweep.ts` | 1372 preset combinations produce no NaN and no malformed hex |
-| `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, the Brand tool starts empty, recipe import/export works, the strip dots edit the recipe, buttons post the right messages |
+| `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, the Brand tool starts on the Starter recipe, recipe import/export works, the strip dots edit the recipe, buttons post the right messages |
 | `test/brand.ts` | step numbers match the DDS names, the recipe reproduces the DDS themes, on-colors match all 40 bases, `recipes/dds.json` still equals a fresh fit of the fixture, and recipe files round-trip and refuse bad input |
 
 ## How the math works
@@ -241,18 +242,18 @@ which allows a single mode.
 light to dark with step and hex, then a table of every variable with its usage. When the
 theme variables exist, the swatches are bound to them, so the sheet follows later edits.
 
-In the plugin window, the **Brand** tool starts empty: no recipe, no colors, nothing to
-create. At the top, Primary, Secondary and Tertiary sit side by side as Figma-style color
+In the plugin window, the **Brand** tool starts on the built-in Starter recipe, with no
+colors. At the top, Primary, Secondary and Tertiary sit side by side as Figma-style color
 fields (swatch inside, hex without the `#`; typing or pasting with it works too), with Name
-below them. Empty fields show `ED1944`, `1672DD` and `333333` as placeholder hints only.
-Import a recipe first; it is kept in the plugin's storage on that computer
+below them. Empty fields show `Brand`, `ED1944`, `1672DD` and `333333` as placeholders and use them as values, so a theme shows on first open. Creating needs a typed name, since the collection is named after it; until one is typed the Create buttons look disabled, and clicking one shows a Figma toast and puts the cursor in Name.
+An imported recipe replaces the Starter and is kept in the plugin's storage on that computer
 (`figma.clientStorage`), so it is still there next time. Then fill in a primary, a secondary
 and a name.
 
 Below the fields, one scrolling panel holds everything else, with no tabs. First the recipe:
-**Reset**, **Clear**, **Import** and **Export** on its heading row (Reset appears only after
-an edit and returns to the imported file; Clear removes the recipe, saved copy included, and
-returns the tool to its empty start), then one column of equal rows, each with its label on
+**Reset**, **Clear**, **Import** and **Export** on its heading row (Reset is always shown and
+live after an edit, returning to the loaded recipe; Clear removes the recipe entirely, and the
+empty panel then offers **Import recipe** and **Use starter**), then one column of equal rows, each with its label on
 top and a full-width bar below: a strip per group
 showing its white → base → black spectrum with a dot on every slot, then **On-color** (the
 contrast ratio from which on-colors turn white, on a plain bar) and **Alpha** (the opacity of
@@ -267,13 +268,13 @@ shape).
 
 ### Recipe files
 
-The recipe is data, not code, and the plugin bundles none. Every number and every fixed
-color comes from the imported file. The DDS one is [recipes/dds.json](recipes/dds.json);
+The recipe is data. The plugin bundles only the Starter (`src/starter.ts`); every number and
+every fixed color comes from the recipe in use. The DDS one is [recipes/dds.json](recipes/dds.json);
 **Import** / **Export** on the Recipe tab read and write this format:
 
 ```json
 {
-  "format": "palette-maker-recipe",
+  "format": "manshur-theme-recipe",
   "version": 1,
   "name": "DDS fit",
   "primary": {
