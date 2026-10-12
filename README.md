@@ -1,4 +1,4 @@
-# figma-palette-maker
+# Manshur Theme Builder (figma-palette-maker)
 
 The color generation engine behind [sds.sallee.design/palette-maker](https://sds.sallee.design/palette-maker),
 extracted from the shipped bundle and rewritten as a readable, dependency-free TypeScript
@@ -28,7 +28,7 @@ pnpm build          # writes dist/code.js and dist/ui.html
 
 Then in the Figma desktop app: **Plugins > Development > Import plugin from manifest**,
 and pick `manifest.json` in this folder. It shows up under Plugins > Development >
-Palette Maker.
+Manshur Theme Builder.
 
 The window is resizable by dragging its right edge, bottom edge, or bottom-right
 corner. There is no grip icon; the edges just change the cursor. Figma exposes no native

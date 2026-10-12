@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Figma/FigJam plugin "Palette Maker" with two tools: **Curves**, an OKLCH color ramp
+Figma/FigJam plugin "Manshur Theme Builder" with two tools: **Curves**, an OKLCH color ramp
 generator ported from sds.sallee.design/palette-maker, and **Brand**, a Digikala Design
 System (DDS) theme generator whose formula is reverse-engineered from the DDS's own brand
 themes. README.md has the full math write-up for both.

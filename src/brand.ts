@@ -55,7 +55,7 @@ const TERTIARY_DEFAULT_KEYS: Array<keyof TertiaryDefault> = ['base', 'tint-1', '
 /* Recipe files                                                                */
 /* -------------------------------------------------------------------------- */
 
-/** Marks a JSON file as a Palette Maker recipe. */
+/** Marks a JSON file as a Manshur Theme Builder recipe. */
 export const RECIPE_FORMAT = 'palette-maker-recipe';
 export const RECIPE_VERSION = 1;
 
@@ -111,10 +111,10 @@ export function recipeFromData(data: unknown): BrandRecipe {
   }
   const file = data as Record<string, unknown>;
   if (file.format !== undefined && file.format !== RECIPE_FORMAT) {
-    throw new Error(`Not a Palette Maker recipe (format "${String(file.format)}")`);
+    throw new Error(`Not a Manshur Theme Builder recipe (format "${String(file.format)}")`);
   }
   if (typeof file.version === 'number' && file.version > RECIPE_VERSION) {
-    throw new Error(`This recipe needs a newer Palette Maker (version ${file.version})`);
+    throw new Error(`This recipe needs a newer Manshur Theme Builder (version ${file.version})`);
   }
 
   const number = (value: unknown, label: string, min: number, max: number): number => {

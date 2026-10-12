@@ -142,7 +142,7 @@ check(
   refusal({ ...good, secondary: { ...good.secondary, 'tint-1': { step: 140 } } }),
   'secondary tint-1 step must be a number from 0 to 100',
 );
-check('other formats are refused', refusal({ ...good, format: 'tokens' }), 'Not a Palette Maker recipe (format "tokens")');
+check('other formats are refused', refusal({ ...good, format: 'tokens' }), 'Not a Manshur Theme Builder recipe (format "tokens")');
 check('hand-written files may skip the header', refusal({ ...good, format: undefined, version: undefined }), '');
 check('onDark must be a color', refusal({ ...good, onDark: 'dark' }), 'onDark must be a hex color like "#0A0A0A"');
 check('tertiaryDefault is optional', refusal({ ...good, tertiaryDefault: undefined }), '');
