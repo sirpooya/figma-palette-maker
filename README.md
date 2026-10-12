@@ -379,6 +379,7 @@ The engine, platform-agnostic and dependency-free:
 | [src/palette.ts](src/palette.ts) | Config types, token numbering, `generatePalette`, CSS/JSON export |
 | [src/brand.ts](src/brand.ts) | DDS brand themes: step numbers, recipe files, `generateBrandTheme` |
 | [recipes/dds.json](recipes/dds.json) | The DDS recipe, fitted to the DDS brand themes; import it in the plugin (not bundled) |
+| [src/starter.ts](src/starter.ts) | The built-in Starter recipe (same numbers as `recipes/dds.json`, neutral name) |
 | [src/index.ts](src/index.ts) | Re-exports the engine (not `figma.ts`) |
 
 The plugin around it:

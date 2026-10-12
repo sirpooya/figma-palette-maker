@@ -146,3 +146,6 @@ The engine must stay bit-identical to the original tool:
   recipe file format (round trip and strict refusals).
 
 `manifest.json` declares no network access; keep it that way.
+
+The plugin is published to Figma Community under ID `1691407481254426803` (in `manifest.json`;
+never change it). Listing assets (icon 128x128, screenshots 1920x1080) live in `_community/`.
