@@ -61,7 +61,7 @@ pnpm test:all       # all of the above
 | `test/golden.ts` | all 16 default stops match the live site's rendered output |
 | `test/differential.ts` | 4784 comparisons against the original minified functions, 0 mismatches |
 | `test/sweep.ts` | 1372 preset combinations produce no NaN and no malformed hex |
-| `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, the Brand tool starts on the Starter recipe, recipe import/export works, the strip dots edit the recipe, buttons post the right messages |
+| `test/ui-smoke.ts` | the built UI renders, sliders drive the ramp, the Brand tool starts on the Starter recipe, recipe import/export and loading from a URL work, the strip dots edit the recipe, buttons post the right messages |
 | `test/brand.ts` | step numbers match the DDS names, the recipe reproduces the DDS themes, on-colors match all 40 bases, `recipes/dds.json` still equals a fresh fit of the fixture, and recipe files round-trip and refuse bad input |
 
 ## How the math works
@@ -251,9 +251,9 @@ An imported recipe replaces the Starter and is kept in the plugin's storage on t
 and a name.
 
 Below the fields, one scrolling panel holds everything else, with no tabs. First the recipe:
-**Reset**, **Clear**, **Import** and **Export** on its heading row (Reset is always shown and
+**Reset**, **Clear**, **Import**, **URL** and **Export** on its heading row (Reset is always shown and
 live after an edit, returning to the loaded recipe; Clear removes the recipe entirely, and the
-empty panel then offers **Import recipe** and **Use starter**), then one column of equal rows, each with its label on
+empty panel then offers **Import recipe**, **Load URL** and **Use starter**), then one column of equal rows, each with its label on
 top and a full-width bar below: a strip per group
 showing its white → base → black spectrum with a dot on every slot, then **On-color** (the
 contrast ratio from which on-colors turn white, on a plain bar) and **Alpha** (the opacity of
@@ -307,6 +307,12 @@ used when no tertiary color is picked; without it, a tertiary color is required.
 **Reset** button's tooltip) and `description` are optional, and so are `format` and `version` in
 a hand-written file. Import is all or nothing: a file with a missing,
 misspelled or out-of-range slot is refused with the reason, and the current recipe stays.
+
+**URL** loads the same format from a JSON endpoint instead of a file: type the address, press
+Enter or **Load**. It goes through the same strict parse, and the last address is remembered.
+The manifest allows any host (`allowedDomains: ["*"]`). The endpoint must send
+`Access-Control-Allow-Origin: *`, because the plugin iframe's origin is `null`. Only the GET for
+the recipe goes out; nothing from the document is sent.
 
 ## Using the engine directly
 
@@ -386,7 +392,7 @@ The plugin around it:
 
 | File | Contents |
 | --- | --- |
-| [manifest.json](manifest.json) | Figma manifest. `documentAccess: dynamic-page`, no network access |
+| [manifest.json](manifest.json) | Figma manifest. `documentAccess: dynamic-page`, network access to any host for recipe URLs |
 | [plugin/code.ts](plugin/code.ts) | Sandbox entry: handles messages, persists config in clientStorage |
 | [plugin/ui/main.ts](plugin/ui/main.ts) | UI iframe: controls, live preview, export panel |
 | [plugin/ui/index.html](plugin/ui/index.html) | UI shell and CSS: Figma UI3 tokens and control metrics over Figma's color variables, fluid, invisible resize edges |

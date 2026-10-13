@@ -355,7 +355,7 @@ check(
     .filter((b) => b.style.display !== 'none')
     .map((b) => b.textContent)
     .join(','),
-  'Reset,Clear,Import,Export',
+  'Reset,Clear,Import,URL,Export',
 );
 click('Export');
 URL.createObjectURL = realCreate;
@@ -375,6 +375,49 @@ await pick('broken.json', '{"primary": {}}');
 check('broken import keeps the recipe', marker('primary-tint-1')?.style.left, '9%');
 check('broken import says why', last('notify')?.message, 'broken.json: primary tint-1 is missing');
 check('as an error toast', last('notify')?.error, true);
+
+// A recipe can come from a JSON endpoint too, through the same strict parse.
+const realFetch = globalThis.fetch;
+const served: Record<string, { status: number; body: string }> = {
+  'http://localhost:3000/served.json': {
+    status: 200,
+    body: JSON.stringify({ ...exportedRecipe, name: 'Served', primary: { ...exportedRecipe.primary, 'tint-1': { step: 7 } } }),
+  },
+  'http://localhost:3000/bad.json': { status: 200, body: '{"primary": {}}' },
+  'http://localhost:3000/missing.json': { status: 404, body: '' },
+};
+globalThis.fetch = (async (input: RequestInfo | URL) => {
+  const hit = served[String(input)];
+  if (!hit) throw new TypeError('Failed to fetch');
+  return new Response(hit.body, { status: hit.status });
+}) as typeof fetch;
+const loadUrl = async (url: string) => {
+  const field = $('.url-row input') as HTMLInputElement;
+  field.value = url;
+  click('Load');
+  await wait(50);
+};
+click('URL');
+check('URL opens the field', Boolean($('.url-row input')), true);
+await loadUrl('http://localhost:3000/served.json');
+check('URL load applies the recipe', marker('primary-tint-1')?.style.left, '7%');
+check('URL load is reported', last('notify')?.message, 'Imported the recipe from http://localhost:3000/served.json');
+check('URL load closes the field', $('.url-row'), null);
+check('URL load takes the JSON name', resetShown('Served'), false);
+click('URL');
+check('the last URL is offered again', ($('.url-row input') as HTMLInputElement).value, 'http://localhost:3000/served.json');
+await loadUrl('http://localhost:3000/bad.json');
+check('a bad URL recipe keeps the recipe', marker('primary-tint-1')?.style.left, '7%');
+check('a bad URL recipe says why', last('notify')?.message, 'http://localhost:3000/bad.json: primary tint-1 is missing');
+await loadUrl('http://localhost:3000/missing.json');
+check('an HTTP error says so', last('notify')?.message, 'http://localhost:3000/missing.json: the server answered 404');
+await loadUrl('http://localhost:9999/x.json');
+check('an unreachable URL is an error', last('notify')?.error, true);
+await wait(300);
+check('the URL is saved', (last('save-brand') as { brand: { recipeUrl?: string } } | undefined)?.brand?.recipeUrl, 'http://localhost:9999/x.json');
+globalThis.fetch = realFetch;
+click('URL');
+await pick('mine.json', JSON.stringify({ ...exportedRecipe, primary: { ...exportedRecipe.primary, 'tint-1': { step: 9 } } }));
 
 // Theme tab lists every variable, and the export has the DDS shape.
 check('theme table lists the 20 colors', $$('.token').length, 20);

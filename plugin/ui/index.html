@@ -590,6 +590,10 @@
   /* Actions keep to the right, with or without a title beside them. */
   .head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--spacer-1); margin-left: auto; }
   .head-actions > button { flex: 0 0 auto; }
+  /* Recipe URL: a field that takes the row, its Load button at the end. */
+  .url-row { display: flex; gap: var(--spacer-1); margin-bottom: var(--spacer-2); }
+  .url-row > input { flex: 1 1 auto; min-width: 0; }
+  .url-row > button { flex: 0 0 auto; }
 
   /* Nothing to show yet: a line of guidance, maybe an action. */
   .empty-state {

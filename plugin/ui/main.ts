@@ -456,6 +456,7 @@ function restoreBrand(saved: BrandSettings): BrandSettings {
   return {
     input: { ...defaultBrand().input, ...saved.input, gradient: '' },
     recipe,
+    recipeUrl: typeof saved.recipeUrl === 'string' ? saved.recipeUrl : '',
     imported:
       recipe && importedRecipe
         ? { name: String(saved.imported?.name || 'imported recipe'), recipe: importedRecipe }
@@ -513,25 +514,26 @@ document.body.append(recipeFile);
 
 // Import replaces the whole recipe or nothing: parseRecipe refuses a file with any missing
 // or out-of-range slot and says which one.
+function applyRecipeText(text: string, source: string, fallbackName: string) {
+  const recipe = parseRecipe(text);
+  const named = (JSON.parse(text) as { name?: unknown }).name;
+  const name = typeof named === 'string' && named.trim() ? named.trim() : fallbackName;
+  const same = JSON.stringify(recipe) === JSON.stringify(brand.recipe);
+  brand.recipe = recipe;
+  brand.imported = { name, recipe: clone(recipe) };
+  render();
+  saveBrand();
+  setStatus(
+    same ? `Imported ${source}: same rules as the recipe already in use` : `Imported the recipe from ${source}`,
+  );
+}
+
 recipeFile.onchange = async () => {
   const picked = recipeFile.files?.[0];
   recipeFile.value = '';
   if (!picked) return;
   try {
-    const text = await picked.text();
-    const recipe = parseRecipe(text);
-    const named = (JSON.parse(text) as { name?: unknown }).name;
-    const name = typeof named === 'string' && named.trim() ? named.trim() : picked.name.replace(/\.json$/i, '');
-    const same = JSON.stringify(recipe) === JSON.stringify(brand.recipe);
-    brand.recipe = recipe;
-    brand.imported = { name, recipe: clone(recipe) };
-    render();
-    saveBrand();
-    setStatus(
-      same
-        ? `Imported ${picked.name}: same rules as the recipe already in use`
-        : `Imported the recipe from ${picked.name}`,
-    );
+    applyRecipeText(await picked.text(), picked.name, picked.name.replace(/\.json$/i, ''));
   } catch (error) {
     setStatus(`${picked.name}: ${error instanceof Error ? error.message : String(error)}`, true);
   }
@@ -541,6 +543,93 @@ function importButton(label = 'Import recipe'): HTMLButtonElement {
   const button = el('button', { textContent: label });
   button.onclick = () => recipeFile.click();
   return button;
+}
+
+/* Recipe URLs --------------------------------------------------------------- */
+
+// A recipe can also come from a JSON endpoint on any host the user types.
+let urlOpen = false;
+let urlLoading = false;
+
+/** The last path segment without .json, as the name when the JSON carries none. */
+function urlName(url: string): string {
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop() ?? '';
+    return decodeURIComponent(last).replace(/\.json$/i, '') || 'recipe';
+  } catch {
+    return 'recipe';
+  }
+}
+
+async function loadRecipeUrl(raw: string) {
+  const url = raw.trim();
+  if (!url) {
+    setStatus('Type the URL of a recipe JSON endpoint', true);
+    return;
+  }
+  if (urlLoading) return;
+  brand.recipeUrl = url;
+  saveBrand();
+  urlLoading = true;
+  let text: string;
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    if (!response.ok) throw new Error(`the server answered ${response.status}`);
+    text = await response.text();
+  } catch (error) {
+    // A request the manifest or CORS blocks fails as a bare TypeError with no detail.
+    const reason =
+      error instanceof TypeError
+        ? 'could not reach it (is the server up, and does it send Access-Control-Allow-Origin?)'
+        : error instanceof Error
+          ? error.message
+          : String(error);
+    setStatus(`${url}: ${reason}`, true);
+    return;
+  } finally {
+    urlLoading = false;
+  }
+  try {
+    urlOpen = false;
+    applyRecipeText(text, url, urlName(url));
+  } catch (error) {
+    urlOpen = true;
+    setStatus(`${url}: ${error instanceof Error ? error.message : String(error)}`, true);
+  }
+}
+
+/** Shows the URL field, from the recipe heading or the empty state. */
+function urlButton(label = 'URL'): HTMLButtonElement {
+  const button = el('button', { textContent: label, title: 'Load a recipe from a JSON endpoint' });
+  button.setAttribute('aria-pressed', String(urlOpen));
+  button.onclick = () => {
+    urlOpen = !urlOpen;
+    renderBrandPanel();
+    if (urlOpen) (panelsEl.querySelector('.url-row input') as HTMLInputElement | null)?.focus();
+  };
+  return button;
+}
+
+/** The URL field and its Load button; Enter loads too. */
+function urlRow(): HTMLElement {
+  const field = el('input', {
+    type: 'text',
+    placeholder: 'http://localhost:3000/recipe.json',
+    value: brand.recipeUrl ?? '',
+    spellcheck: false,
+  });
+  field.inputMode = 'url';
+  field.setAttribute('aria-label', 'Recipe URL');
+  field.onkeydown = (event) => {
+    if (event.key === 'Enter') void loadRecipeUrl(field.value);
+    if (event.key === 'Escape') {
+      urlOpen = false;
+      renderBrandPanel();
+    }
+  };
+  const load = el('button', { textContent: 'Load' });
+  load.onclick = () => void loadRecipeUrl(field.value);
+  return el('div', { className: 'url-row' }, [field, load]);
 }
 
 /** Hand a text file to the user; Figma's plugin iframe allows downloads. */
@@ -857,7 +946,7 @@ function recipeRulesCard(recipe: BrandRecipe): HTMLElement {
     saveBrand();
     setStatus(`Removed the recipe "${name}"`);
   };
-  actions.push(clear, importButton('Import'), exportButton);
+  actions.push(clear, importButton('Import'), urlButton(), exportButton);
   syncReset();
 
   const strips = el('div', { className: 'strips' });
@@ -903,6 +992,7 @@ function recipeRulesCard(recipe: BrandRecipe): HTMLElement {
 
   return el('div', { className: 'card' }, [
     el('div', { className: 'card-head' }, [el('div', { className: 'head-actions' }, actions)]),
+    ...(urlOpen ? [urlRow()] : []),
     el('div', { className: 'recipe-rows' }, [strips, onColor, alpha]),
   ]);
 }
@@ -1021,10 +1111,11 @@ function renderBrandPanel() {
   if (!recipe) {
     panelsEl.append(
       emptyState(
-        'No recipe. Import a recipe file, or use the built-in starter; it is kept in the ' +
-          'plugin on this computer, so it is still here next time.',
-        [importButton(), starterButton()],
+        'No recipe. Import a recipe file, load one from a URL, or use the built-in starter; it ' +
+          'is kept in the plugin on this computer, so it is still here next time.',
+        [importButton(), urlButton('Load URL'), starterButton()],
       ),
+      ...(urlOpen ? [urlRow()] : []),
     );
     return;
   }

@@ -21,6 +21,8 @@ export interface BrandSettings {
   recipe: BrandRecipe | null;
   /** The recipe as imported, for "Reset to <name>". */
   imported: { name: string; recipe: BrandRecipe } | null;
+  /** The last JSON endpoint a recipe was loaded from, offered again next time. */
+  recipeUrl?: string;
 }
 
 export type UiToPlugin =

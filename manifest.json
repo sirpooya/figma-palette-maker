@@ -7,7 +7,7 @@
   "ui": "dist/ui.html",
   "documentAccess": "dynamic-page",
   "networkAccess": {
-    "allowedDomains": ["none"],
-    "reasoning": "All palette math runs locally. The plugin never makes network requests."
+    "allowedDomains": ["*"],
+    "reasoning": "Loads a theme recipe (JSON) from a URL the user provides. The URL can point to any host, so recipes can be hosted anywhere. Nothing from the document is sent."
   }
 }

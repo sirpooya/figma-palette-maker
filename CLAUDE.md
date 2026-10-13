@@ -89,7 +89,8 @@ Rules that follow from the boundary:
   docs) stays. The Brand tool starts with one built-in recipe, `src/starter.ts` ("Starter",
   the same numbers as `recipes/dds.json`; `test/brand.ts` checks they match). An imported
   recipe replaces it and lives in clientStorage; **Clear** removes the recipe entirely (saved as null, so it stays empty on reopen) and the
-  empty panel offers **Import recipe** and **Use starter**. Only a first run gets the starter.
+  empty panel offers **Import recipe**, **Load URL** and **Use starter**. **URL** fetches a recipe
+  JSON from an endpoint through the same `applyRecipeText` / `parseRecipe` path as a file. Only a first run gets the starter.
   Empty fields fall back to their placeholders (`Brand`, `#ED1944`, `#1672DD`; tertiary to the
   recipe set), so a theme shows on first open (the user's call, 2026-10-12). The Create buttons look
   disabled until a name is typed; clicking one then shows an error toast and focuses Name.
@@ -145,7 +146,9 @@ The engine must stay bit-identical to the original tool:
   slots, on-colors against all 40 bases, `recipes/dds.json` against a fresh fit, and the
   recipe file format (round trip and strict refusals).
 
-`manifest.json` declares no network access; keep it that way.
+`manifest.json` sets `allowedDomains: ["*"]` so **URL** can load a recipe JSON from any host
+(the user's call, 2026-10-13, same as figma-uikit-catalog). The only request is that GET; never
+send document data anywhere.
 
 The plugin is published to Figma Community under ID `1691407481254426803` (in `manifest.json`;
 never change it). Listing assets (icon 128x128, screenshots 1920x1080) live in `_community/`.
